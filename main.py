@@ -12,6 +12,7 @@ import webbrowser
 import threading
 import urllib.request
 import urllib.error
+import subprocess
 
 # PyQt6-WebEngine — опциональная зависимость
 try:
@@ -48,6 +49,16 @@ CONFIG_FILE = Path("config.json")
 WEB_PORT = 8080       # порт по умолчанию для Raspberry Pi
 MIKROTIK_PORT = 80    # порт по умолчанию для MikroTik
 PING_TIMEOUT = 2          # секунд на попытку TCP-connect
+
+# Режими перевірки доступності
+PING_MODE_TCP  = "tcp"   # TCP-connect на вказаний порт (за замовчуванням)
+PING_MODE_HTTP = "http"  # HTTP GET запит, перевіряє код відповіді
+PING_MODE_ICMP = "icmp"  # ICMP ping через системну команду ping
+PING_MODES = {
+    PING_MODE_TCP:  "TCP connect",
+    PING_MODE_HTTP: "HTTP GET",
+    PING_MODE_ICMP: "ICMP ping",
+}
 CHECK_INTERVAL_MS = 5000  # интервал автопроверки, мс
 
 GITHUB_REPO   = "MuxaeLka/RaspbeNRK"
@@ -57,7 +68,7 @@ VIEW_TABLE    = "table"  # режим таблицы
 
 # GIF-анімація спінера (base64, вбудована в код)
 SPINNER_GIF_B64 = "R0lGODlhHgAeAIEAAAAAAOZkHjw8PAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQJBQAAACwAAAAAHgAeAAAIggABCBxIsKDBgwgTKlzIsCHDABADOFwYMaKAiQYrVhTAEaNAjRs5XnQIsiIAkSIbmkSI8iHEhikTrlzYEmHEiTEz3nRYs+BOnB11SsSYk+BPki+Fejw6kKnLoT6dypQKgOpBqzMVZlX69ClUoV+nbgU5sSTZpWaTevx4dq3bt3DhBgQAIfkECQUAAAAsAAAAAB4AHgCBAAAA5mQePDw8AAAACIYAAQgcSLCgwYMIEypcyLChQwABIj5EGLFixYkELWoMIAAjxI0WBXR0uHFgRZEoG1pMiHKkwosMUyZcGVPmQZgNbRakmVOnSYkTfQrE6VDoxwAYjRLt6TIj0IdKl77k2NQpUpJPDfKcmlVrV4pfvYYdKvWmxp1nsYLcqnatx59p38qdSxdjQAAh+QQJBQAAACwAAAAAHgAeAIEAAADmZB48PDwAAAAIhgABCBxIsKDBgwgTKlzIsKHDhwwDSJwYAGJBihgnWszIsWLDjBcpCvio0SDGkQtLIpwooKVCig1bulwp8aFMmjUdykQZ0qPNmT0t3jSZ8ydPgip1AkVaVOnRgTCdPoXadOHQg1FTXsValeZUol2phgWbFABIhx0xWjSb1udajmvjyp1LF0BAACH5BAkFAAAALAAAAAAeAB4AgQAAAOZkHjw8PAAAAAiFAAEIHEiwoMGDCBMqXMiwocOHDANInBgAYkGKGCVaBJCx48OMFzE2pJhQpMKJC00iJHmSooCSGiNKFPDyIMuGNGnajPkw586KEH0aRBlU51CeDoWGBNrT6FKmDHPWPAp1oVKqVRFKbZn14NWVRG1+BXtToMupMjuWdag27EaPG+PKnUs3IAAh+QQJBQAAACwAAAAAHgAeAIEAAADmZB48PDwAAAAIhAABCBxIsKDBgwgTKlzIsKHDhwwDSJwYAGJBihglWgSQsePDjBcxNqSYkOTCiSM1lkQZkeVBlydNhlTZEuZAmwpFGsSZU6KAlzQdChgKtCLEoT93Bm2ItKhRpk2LPozqFCrRlU8VUsWatSDSpDFlCvx6NWXHAFsdnkULdqPHjXDjyp0bEAAh+QQJBQAAACwAAAAAHgAeAIEAAADmZB48PDwAAAAIggABCBxIsKDBgwgTKlzIsKHDhwwDSJwYAGJBihglWgSQsePDjBcxNqSYkOTCiSM1lkQZkeVBly0rvoR5kqZAmytx4kQo0uDOmTpVpgwq0+FEAUCLMhTAFCnQh01zKk3Y1ClPoQqj1sRasOpQmlWZfswY1upYimE3DkQrVq3bt3A3BgQAIfkECQUAAAAsAAAAAB4AHgCBAAAA5mQePDw8AAAACIIAAQgcSLCgwYMIEypcyLChw4cMA0icGABiQYoYJVoEkLHjw4wXMTakmJDkwokjNZZEGZHlQZctK76EeZKmQJs1ZYbU6RAnzpUqd340KbQnUYJHFYqcyTMn0KYIBUgVoDSowqkxoQ6cSjWrVQBcpQ6VGJbrxollxW4UmHat27dw1wYEACH5BAkFAAAALAAAAAAeAB4AgQAAAOZkHjw8PAAAAAiDAAEIHEiwoMGDCBMqXMiwocOHDANInBgAYkGKGCVaBJCx48OMFzE2pJiQ5MKJIzWWRBmR5UGXLSu+hHmSpkCbNWWG1OkQJ06FPlV+FErw50qeA03m/Gk0qUiESqE+lYrU4NSjVQcKaOo0gICvBb+KFfBwrNmxG8+a3aj1LNu3cOOyDQgAIfkECQUAAAAsAAAAAB4AHgCBAAAA5mQePDw8AAAACIMAAQgcSLCgwYMIEypcyLChw4cMA0icGABiQYoYJVoEkLHjw4wXMTakmJDkwokjNZZEGZHlQZctK76EeZKmQJs1ZYbU6RAnToU+VX4USvDnSp4DTaYkWpQpUKdJjXIEWVKAgKNKE1q1OjOr1q1cm3pVCLasAKkIzZbdOFAt27dw47INCAAh+QQJBQAAACwAAAAAHgAeAIEAAADmZB48PDwAAAAIhQABCBxIsKDBgwgTKlzIsKHDhwwDSJwYAGJBihglWgSQsePDjBcxNqSYkOTCiSM1lkQZkeVBly0rvoR5kqZAmzVlhtTpECdOhT5VfhRK8OdKngMnChhKlKCAp0wTPoUaE2nBqSmtGpy6tKhGkwu5Uu3YVKFYAR4tigW5USBXo23jyp2rMCAAIfkECQUAAAAsAAAAAB4AHgCBAAAA5mQePDw8AAAACIIAAQgcSLCgwYMIEypcyLChw4cMA0icGABiQYoYJVoEkLHjw4wXMTakmJDkwokjNZZEGZHlQZctK76EeZKmQJs1ZYbU6RAnToU4BQi1GHQoxKJGU6o0KFTAx6VMmyrlGdVpTIZNrXJcanJhVqEdu2JtGpZqQ7IeNwoEK1at27dwHwYEACH5BAkFAAAALAAAAAAeAB4AgQAAAOZkHjw8PAAAAAiDAAEIHEiwoMGDCBMqXMiwocOHDANInBgAYkGKGCVaBJCx48OMFzE2pJiQ5MKJIzWWRBmR5UGXLSseFCBAZUqbBGkKsAhzoE6eOH3SBCqz4E+IPQUe/RhU6dKYRY0OdZhU6NSTVa3eZKizZlOTC3WKFAjSodeOWRWiTYu17Ma3cOPGDQgAIfkECQUAAAAsAAAAAB4AHgCBAAAA5mQePDw8AAAACIQAAQgcSLCgwYMIEypcyLChw4cMA0icGABiQYoYJVoEkLHjw4wXMTakmJDkwokjNSYUwLJiRJQIWQr4qNKgzJkOTRaUaRHmTpY9axLkCdHnUKBFhQ4kStPlT6QplS6F+tKpzZZSQ2ZdKrLkVoJdDepUCBJs2JMdyyZNazXo2Y1w48qFGxAAIfkECQUAAAAsAAAAAB4AHgCBAAAA5mQePDw8AAAACIIAAQgcSLCgwYMIEypcyLChw4cMA0icGABiQYoYJVoEkLHjQwECKF7E2BBkyIQiF5psOFGhSQEsWyJc6VCmwZcPUxakmVPjTZAWbRLkWdPnTqAQhQ4kGrPiT6UooQokGdGoQaoKdV7VilAqQaxbrUblmrFnR65Nz24c6HGt27dwNwYEACH5BAkFAAAALAAAAAAeAB4AgQAAAOZkHjw8PAAAAAiDAAEIHEiwoMGDCBMqXMiwocOHDANInBgAYkEBAihqtAgAY0aNFB969FgQZMORCUMuJBlRokKULV0iZNlw4kyaMSsaxFlT5kWMFm0aFPqQ6MCNRX0eVenQqECkPZUularQKUGmVa1epXpQa0mvALCmhPqU7EKQaDmiFQsxLce3cOPKDQgAIfkECQUAAAAsAAAAAB4AHgCBAAAA5mQePDw8AAAACH4AAQgcSLCgwYMIEypcyLChw4cMBUgMQDEAxIISM1aseBFARo0bKT78KLFgSIsRMybcmFJAQ44JP76EeVClQ5oYbc4UaRDnzp4sH/oEEBLi0KJCeZpUepPpwKA7UQKVynDoU6tTqU79uRBq1qhOTyY9idQoWaxgnXZcy7Ztx4AAIfkECQUAAAAsAAAAAB4AHgCBAAAA5mQePDw8AAAACIEAAQgcSLCgwYMIEypcyLChw4cMBUicKABiQYoUA2i0CABjRo0BHnosCBJkQ4oJS0aU2NAkQpAsGao0WDKkQ5ckZ7bEObAmRJ49N/4UmtPmQ6ACkS5UqlQh06YHdRY9SpQmVIJSrRp1WvUl1Kxes9bcunTsWI5mwVL1ybGt27dwAwIAIfkECQUAAAAsAAAAAB4AHgCBAAAA5mQePDw8AAAACIQAAQgcSLCgwYMIEypcyLChw4cMBUicKABiQYoYJVoEkLGjwwAgKV6UCDLAwpIhE6I8uZKlSZUtFcY0OFMmSIQ1bd6kufNhyYM/IQYtOPRjT4JFGyYVuNQl0KY4oUJ9+pJqVZ1XeWaNulVrV6ZTkaLMOvar1bJhuaI1yxDtxrdw48oFEBAAIfkECQUAAAAsAAAAAB4AHgCBAAAA5mQePDw8AAAACIcAAQgcSLCgwYMIEypcyLChw4cMBUicKADiwAAYKWqs+BCjx40UO3oMwHHgxoYjAyAMuTDlQgEYFY5E6TFhTYc3Dc7EmZNgT5oqdcaE+FNg0ZZDCx6VmdRnU6AHdwINKpQqw6UApDJ9qpRrVK9dwWbF6lTrWLNbU7q0qHatRaNq38qdS7cugIAAIfkECQUAAAAsAAAAAB4AHgCBAAAA5mQePDw8AAAACIYAAQgcSLCgwYMIEypcyLChwgAQHTKESFGARQESDVKEePFiRoEbOXa0KDFkxIEjMU6kmLDjygANPSbcGFPmQZYObRakmRPnzpMlgRL06ZDoQKMvbwptiBRA04dLQT5VGlUqzKJVrV5dyBPh1KFZwYbtCpWs05BBTaL9qNZsRrUf48qdS9dgQAA7"
-APP_VERSION = "1.0.9"
+APP_VERSION = "1.1.0"
 
 DEFAULT_DEVICES = [
     {"name": "NRK-1", "ip": "10.60.93.50", "port": 8080, "device_type": "raspberry"},
@@ -503,12 +514,14 @@ class Device:
     """Одно устройство с состоянием мониторинга. Поддерживает Raspberry Pi и MikroTik."""
 
     def __init__(self, name: str, ip: str, port: int = WEB_PORT,
-                 device_type: str = "raspberry", icon: str = ""):
+                 device_type: str = "raspberry", icon: str = "",
+                 ping_mode: str = PING_MODE_TCP):
         self.name = name
         self.ip = ip
         self.port = port
         self.device_type = device_type  # "raspberry" | "mikrotik" | custom
-        self.icon = icon  # индивидуальная иконка (emoji); если пусто — берём из типа
+        self.icon = icon  # індивідуальна іконка (emoji); якщо порожньо — з типу
+        self.ping_mode = ping_mode  # tcp | http | icmp
         self.online: bool | None = None   # None = ещё не проверяли
         self.ping_ms: float | None = None
         self.last_seen: datetime | None = None
@@ -533,6 +546,7 @@ class Device:
             "port": self.port,
             "device_type": self.device_type,
             "icon": self.icon,
+            "ping_mode": self.ping_mode,
         }
 
     @staticmethod
@@ -543,6 +557,7 @@ class Device:
             port=d.get("port", WEB_PORT),
             device_type=d.get("device_type", "raspberry"),
             icon=d.get("icon", ""),
+            ping_mode=d.get("ping_mode", PING_MODE_TCP),
         )
 
     def effective_icon(self) -> str:
@@ -553,28 +568,84 @@ class Device:
 
 class PingWorker(QThread):
     """
-    Выполняет TCP-connect на порт 8080 чтобы определить доступность.
-    Используем TCP вместо ICMP — не требует прав администратора.
+    Перевіряє доступність пристрою одним із трьох режимів:
+    - TCP  : TCP-connect на вказаний порт (не потребує прав адміністратора)
+    - HTTP : HTTP GET запит, пристрій вважається онлайн якщо відповідь < 400
+    - ICMP : системна команда ping (потребує мережевого доступу до хосту)
     """
     result = pyqtSignal(str, bool, float)  # ip, online, ping_ms
 
-    def __init__(self, ip: str, port: int, timeout: float = PING_TIMEOUT):
+    def __init__(self, ip: str, port: int,
+                 ping_mode: str = PING_MODE_TCP,
+                 timeout: float = PING_TIMEOUT):
         super().__init__()
         self.ip = ip
         self.port = port
+        self.ping_mode = ping_mode
         self.timeout = timeout
         self._stop_flag = False
 
     def run(self):
         if self._stop_flag:
             return
+        if self.ping_mode == PING_MODE_TCP:
+            self._run_tcp()
+        elif self.ping_mode == PING_MODE_HTTP:
+            self._run_http()
+        elif self.ping_mode == PING_MODE_ICMP:
+            self._run_icmp()
+        else:
+            self._run_tcp()
+
+    def _run_tcp(self):
+        """TCP-connect — найшвидший, перевіряє конкретний порт."""
         t0 = time.monotonic()
         try:
             with socket.create_connection((self.ip, self.port), timeout=self.timeout):
                 pass
-            elapsed = (time.monotonic() - t0) * 1000  # в мс
+            elapsed = (time.monotonic() - t0) * 1000
             self.result.emit(self.ip, True, round(elapsed, 1))
         except (OSError, socket.timeout, ConnectionRefusedError):
+            elapsed = (time.monotonic() - t0) * 1000
+            self.result.emit(self.ip, False, round(elapsed, 1))
+
+    def _run_http(self):
+        """HTTP GET — перевіряє що веб-сервер відповідає (код < 400)."""
+        t0 = time.monotonic()
+        try:
+            url = f"http://{self.ip}:{self.port}/"
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                online = resp.status < 400
+            elapsed = (time.monotonic() - t0) * 1000
+            self.result.emit(self.ip, online, round(elapsed, 1))
+        except Exception:
+            elapsed = (time.monotonic() - t0) * 1000
+            self.result.emit(self.ip, False, round(elapsed, 1))
+
+    def _run_icmp(self):
+        """ICMP ping — системна команда, не залежить від порту."""
+        t0 = time.monotonic()
+        try:
+            # Windows: ping -n 1 -w <timeout_ms> <ip>
+            # Linux/Mac: ping -c 1 -W <timeout_s> <ip>
+            import platform
+            if platform.system().lower() == "windows":
+                cmd = ["ping", "-n", "1", "-w",
+                       str(int(self.timeout * 1000)), self.ip]
+            else:
+                cmd = ["ping", "-c", "1", "-W", str(int(self.timeout)), self.ip]
+
+            proc = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=self.timeout + 1
+            )
+            elapsed = (time.monotonic() - t0) * 1000
+            online = proc.returncode == 0
+            self.result.emit(self.ip, online, round(elapsed, 1))
+        except Exception:
             elapsed = (time.monotonic() - t0) * 1000
             self.result.emit(self.ip, False, round(elapsed, 1))
 
@@ -627,6 +698,7 @@ class DeviceDialog(QDialog):
         self.type_combo = QComboBox()
         self.type_combo.setStyleSheet(combo_style)
         self.type_combo.currentIndexChanged.connect(self._on_type_changed)
+        # ping_combo підключимо після його створення (нижче в коді)
         self._populate_type_combo()  # первичное заполнение
 
         # Индивидуальная иконка устройства
@@ -727,17 +799,13 @@ class DeviceDialog(QDialog):
             self.icon_combo.setCurrentIndex(idx)
 
     def _update_hint(self):
-        dtype = self.type_combo.currentData()
-        if dtype == "mikrotik":
-            self.hint_lbl.setText(
-                "Подвійний клік відкриває winbox://IP  •  "
-                "Перевірка: TCP-connect на вказаний порт"
-            )
-        else:
-            self.hint_lbl.setText(
-                "Подвійний клік відкриває http://IP:PORT  •  "
-                "Перевірка: TCP-connect на вказаний порт"
-            )
+        mode_label = PING_MODES.get(
+            self.ping_combo.currentData() if hasattr(self, "ping_combo") else PING_MODE_TCP,
+            "TCP connect"
+        )
+        self.hint_lbl.setText(
+            f"Подвійний клік → http://IP:PORT  •  Перевірка: {mode_label}"
+        )
 
     def _on_accept(self):
         name = self.name_edit.text().strip()
@@ -755,13 +823,14 @@ class DeviceDialog(QDialog):
             return
         self.accept()
 
-    def get_values(self) -> tuple[str, str, int, str, str]:
+    def get_values(self) -> tuple[str, str, int, str, str, str]:
         return (
             self.name_edit.text().strip(),
             self.ip_edit.text().strip(),
             int(self.port_edit.text().strip()),
             self.type_combo.currentData(),
             self.icon_combo.currentData(),
+            self.ping_combo.currentData(),
         )
 
 
@@ -822,7 +891,15 @@ class DeviceCard(QFrame):
         self._type_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._type_lbl)
 
-        # Отклик / статус
+        # Режим пінгу
+        self._mode_lbl = QLabel()
+        self._mode_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._mode_lbl.setStyleSheet(
+            f"font-size:9px; color:{PALETTE['text_dim']}; background:transparent;"
+        )
+        layout.addWidget(self._mode_lbl)
+
+        # Відгук / статус
         self._ping_lbl = QLabel()
         self._ping_lbl.setObjectName("card_ping")
         self._ping_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -843,6 +920,8 @@ class DeviceCard(QFrame):
             f"font-size:9px; font-weight:600; letter-spacing:0.6px;"
             f"color:{d.type_color()}; background:transparent;"
         )
+        mode = PING_MODES.get(d.ping_mode, "TCP connect")
+        self._mode_lbl.setText(mode)
 
         # Статус и свечение
         if d.online is None:
@@ -1847,11 +1926,13 @@ class MainWindow(QMainWindow):
         ip_item.setFont(QFont("Consolas", 12))
         self.table.setItem(row, 1, ip_item)
 
-        # Тип устройства (col 2)
+        # Тип пристрою (col 2) + tooltip з режимом пінгу
         type_item = QTableWidgetItem(device.type_label())
         type_item.setForeground(QBrush(QColor(device.type_color())))
         type_item.setFont(QFont("Segoe UI", 11, QFont.Weight.Medium))
         type_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        mode_label = PING_MODES.get(device.ping_mode, "TCP connect")
+        type_item.setToolTip(f"Перевірка: {mode_label}")
         self.table.setItem(row, 2, type_item)
 
         # Статус (col 3+)
@@ -1996,7 +2077,7 @@ class MainWindow(QMainWindow):
             # Если уже работает — не дублируем
             if ip in self._workers and self._workers[ip].isRunning():
                 return
-            worker = PingWorker(ip, device.port)
+            worker = PingWorker(ip, device.port, device.ping_mode)
             worker.result.connect(self._on_ping_result)
             # Удаляем воркер из словаря после завершения потока
             worker.finished.connect(lambda ip=ip: self._cleanup_worker(ip))
@@ -2133,15 +2214,15 @@ class MainWindow(QMainWindow):
     def _add_device(self):
         dlg = DeviceDialog(self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
-            name, ip, port, dtype, icon = dlg.get_values()
+            name, ip, port, dtype, icon, ping_mode = dlg.get_values()
             if any(d.ip == ip for d in self.devices):
                 QMessageBox.warning(self, "Дублікат", f"Пристрій з IP {ip} вже існує.")
                 return
-            device = Device(name, ip, port, dtype, icon)
+            device = Device(name, ip, port, dtype, icon, ping_mode)
             self.devices.append(device)
             self._save_config()
             self._populate_table()
-            self._log(f"Додано пристрій: {name} ({ip}:{port}) [{dtype}]")
+            self._log(f"Додано пристрій: {name} ({ip}:{port}) [{dtype}] [{ping_mode}]")
             self._check_device(device)
 
     def _edit_device(self):
@@ -2152,7 +2233,7 @@ class MainWindow(QMainWindow):
         dlg = DeviceDialog(self, device)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             old_ip = device.ip
-            new_name, new_ip, new_port, new_type, new_icon = dlg.get_values()
+            new_name, new_ip, new_port, new_type, new_icon, new_ping = dlg.get_values()
             if new_ip != old_ip and any(d.ip == new_ip for d in self.devices):
                 QMessageBox.warning(self, "Дублікат", f"Пристрій з IP {new_ip} вже існує.")
                 return
@@ -2161,6 +2242,7 @@ class MainWindow(QMainWindow):
             device.port = new_port
             device.device_type = new_type
             device.icon = new_icon
+            device.ping_mode = new_ping
             device.online = None
             device.ping_ms = None
             self._save_config()
