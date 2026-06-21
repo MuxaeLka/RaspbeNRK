@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# VS
+.vs/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Archives
+*.zip
+
+# Local configs
+.env
