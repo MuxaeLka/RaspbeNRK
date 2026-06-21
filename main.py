@@ -52,7 +52,7 @@ GITHUB_REPO   = "MuxaeLka/RaspbeNRK"
 GITHUB_API    = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 VIEW_GRID     = "grid"   # режим карточек
 VIEW_TABLE    = "table"  # режим таблицы
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 
 DEFAULT_DEVICES = [
     {"name": "NRK-1", "ip": "10.60.93.50", "port": 8080, "device_type": "raspberry"},
@@ -892,7 +892,16 @@ class UpdateChecker(QThread):
             assets = data.get("assets", [])
             url = next((a["browser_download_url"] for a in assets
                         if a["name"].endswith(".exe")), "")
-            if tag and tag != APP_VERSION and url:
+
+            # Сравниваем версии как кортежи чисел, а не строки
+            # "1.0.9" < "1.0.10" — строковое сравнение даст неверный результат
+            def ver_tuple(v: str):
+                try:
+                    return tuple(int(x) for x in v.split("."))
+                except ValueError:
+                    return (0,)
+
+            if tag and ver_tuple(tag) > ver_tuple(APP_VERSION) and url:
                 self.update_available.emit(tag, url)
             else:
                 self.no_update.emit()
@@ -1355,42 +1364,67 @@ class AddTypeDialog(QDialog):
 class HeaderWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 12)
-        layout.setSpacing(2)
+        self.setFixedHeight(56)
+        self.setStyleSheet(
+            f"background-color:{PALETTE['bg_panel']};"
+            f"border-bottom:1px solid {PALETTE['border']};"
+        )
 
-        row = QHBoxLayout()
+        row = QHBoxLayout(self)
+        row.setContentsMargins(16, 0, 16, 0)
+        row.setSpacing(10)
+
+        # Иконка — создаём через QPixmap напрямую без make_app_icon()
+        # чтобы не зависеть от порядка инициализации QApplication
         icon_lbl = QLabel()
-        icon_lbl.setPixmap(make_app_icon().pixmap(36, 36))
+        icon_lbl.setFixedSize(32, 32)
+        icon_lbl.setStyleSheet(
+            f"background:{PALETTE['accent']}; border-radius:8px;"
+            f"color:#ffffff; font-size:16px; font-weight:700;"
+        )
+        icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_lbl.setText("N")
         row.addWidget(icon_lbl)
 
-        title_col = QVBoxLayout()
-        title_col.setSpacing(1)
-        t = QLabel("NRK Manager")
-        t.setObjectName("heading")
-        t.setStyleSheet(f"font-size:17px; font-weight:700; color:{PALETTE['text_main']};")
-        sub = QLabel("Менеджер Raspberry Pi через WireGuard")
-        sub.setObjectName("subheading")
-        sub.setStyleSheet(f"font-size:11px; color:{PALETTE['text_dim']};")
-        title_col.addWidget(t)
-        title_col.addWidget(sub)
+        # Текстовый блок
+        text_col = QVBoxLayout()
+        text_col.setSpacing(0)
+        text_col.setContentsMargins(0, 0, 0, 0)
 
-        row.addLayout(title_col)
+        t = QLabel("NRK Manager")
+        t.setStyleSheet(
+            f"font-size:15px; font-weight:700; color:{PALETTE['text_main']};"
+            f"background:transparent; border:none;"
+        )
+        sub = QLabel("Менеджер Raspberry Pi через WireGuard")
+        sub.setStyleSheet(
+            f"font-size:10px; color:{PALETTE['text_dim']};"
+            f"background:transparent; border:none;"
+        )
+        text_col.addWidget(t)
+        text_col.addWidget(sub)
+        row.addLayout(text_col)
+
         row.addStretch()
 
-        self.status_lbl = QLabel("● Ожидание проверки")
-        self.status_lbl.setStyleSheet(f"color:{PALETTE['text_dim']}; font-size:12px;")
+        # Статус онлайн
+        self.status_lbl = QLabel("● Ожидание...")
+        self.status_lbl.setFixedHeight(24)
+        self.status_lbl.setStyleSheet(
+            f"color:{PALETTE['text_dim']}; font-size:12px;"
+            f"background:transparent; border:none;"
+        )
         row.addWidget(self.status_lbl)
-
-        layout.addLayout(row)
-        self.setStyleSheet(f"background-color:{PALETTE['bg_panel']}; border-bottom:1px solid {PALETTE['border']};")
 
     def set_status(self, online: int, total: int):
         color = PALETTE["online"] if online == total else (
             PALETTE["warn"] if online > 0 else PALETTE["offline"]
         )
         self.status_lbl.setText(f"● {online}/{total} онлайн")
-        self.status_lbl.setStyleSheet(f"color:{color}; font-size:12px; font-weight:600;")
+        self.status_lbl.setStyleSheet(
+            f"color:{color}; font-size:12px; font-weight:600;"
+            f"background:transparent; border:none;"
+        )
 
 # ─── Главное окно ──────────────────────────────────────────────────────────────
 
