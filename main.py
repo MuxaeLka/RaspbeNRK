@@ -33,8 +33,10 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import (
     Qt, QThread, pyqtSignal, QTimer, QSortFilterProxyModel,
-    QItemSelectionModel, QSize, QPropertyAnimation, QEasingCurve
+    QItemSelectionModel, QSize, QPropertyAnimation, QEasingCurve,
+    QByteArray, QBuffer, QIODevice
 )
+from PyQt6.QtGui import QMovie
 from PyQt6.QtGui import (
     QColor, QFont, QIcon, QPalette, QBrush, QAction,
     QLinearGradient, QPainter, QPixmap
@@ -52,7 +54,10 @@ GITHUB_REPO   = "MuxaeLka/RaspbeNRK"
 GITHUB_API    = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 VIEW_GRID     = "grid"   # режим карточек
 VIEW_TABLE    = "table"  # режим таблицы
-APP_VERSION = "1.0.6"
+
+# GIF-анімація спінера (base64, вбудована в код)
+SPINNER_GIF_B64 = "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"
+APP_VERSION = "1.0.9"
 
 DEFAULT_DEVICES = [
     {"name": "NRK-1", "ip": "10.60.93.50", "port": 8080, "device_type": "raspberry"},
@@ -385,8 +390,16 @@ QTabBar::tab:hover:!selected {{
 }}
 
 QTabBar::close-button {{
-    image: none;
     subcontrol-position: right;
+    background: transparent;
+    border-radius: 3px;
+    color: {PALETTE['offline']};
+    width: 14px;
+    height: 14px;
+}}
+
+QTabBar::close-button:hover {{
+    background: rgba(248, 81, 73, 0.2);
 }}
 
 QToolButton#nav_btn {{
@@ -1359,6 +1372,52 @@ class AddTypeDialog(QDialog):
             self.color_combo.currentData(),
         )
 
+
+# ─── Кнопка з GIF-анімацією ───────────────────────────────────────────────────
+
+class AnimatedButton(QPushButton):
+    """
+    Кнопка яка показує GIF-анімацію зліва від тексту.
+    Анімація запускається/зупиняється через start_anim()/stop_anim().
+    """
+    def __init__(self, text: str, gif_b64: str, parent=None):
+        super().__init__(text, parent)
+        self._text = text
+        self._anim_active = False
+
+        # Завантажуємо GIF з base64 в пам'ять
+        import base64 as _b64
+        raw = _b64.b64decode(gif_b64)
+        ba = QByteArray(raw)
+        self._buf = QBuffer(ba)
+        self._buf.open(QIODevice.OpenModeFlag.ReadOnly)
+        self._movie = QMovie()
+        self._movie.setDevice(self._buf)
+        self._movie.setCacheMode(QMovie.CacheMode.CacheAll)
+        self._movie.frameChanged.connect(self._on_frame)
+        self._movie.start()
+        self._movie.setPaused(True)  # починаємо на паузі
+
+    def _on_frame(self, _frame_num: int):
+        """Оновлюємо іконку кнопки при кожному кадрі GIF."""
+        if self._anim_active:
+            pixmap = self._movie.currentPixmap().scaled(
+                20, 20,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.setIcon(QIcon(pixmap))
+            self.setIconSize(QSize(20, 20))
+
+    def start_anim(self):
+        self._anim_active = True
+        self._movie.setPaused(False)
+
+    def stop_anim(self):
+        self._anim_active = False
+        self._movie.setPaused(True)
+        self.setIcon(QIcon())
+
 # ─── Виджет заголовка ─────────────────────────────────────────────────────────
 
 class HeaderWidget(QWidget):
@@ -1549,7 +1608,7 @@ class MainWindow(QMainWindow):
         top_layout.setContentsMargins(12, 12, 12, 8)
         top_layout.setSpacing(10)
 
-        # Тулбар
+        # Тулбар (двохрядковий)
         toolbar = self._build_toolbar()
         top_layout.addLayout(toolbar)
 
@@ -1633,7 +1692,13 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.statusbar)
         self.statusbar.showMessage("Готово")
 
-    def _build_toolbar(self) -> QHBoxLayout:
+    def _build_toolbar(self) -> QVBoxLayout:
+        # Двохрядковий тулбар
+        outer = QVBoxLayout()
+        outer.setSpacing(4)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        # ── Рядок 1: пошук + основні кнопки ──────────────────────────────
         tb = QHBoxLayout()
         tb.setSpacing(8)
 
@@ -1641,11 +1706,9 @@ class MainWindow(QMainWindow):
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText("🔍  Пошук за іменем або IP...")
         self.search_edit.setFixedHeight(32)
-        self.search_edit.setMaximumWidth(260)
+        self.search_edit.setMaximumWidth(380)
         self.search_edit.textChanged.connect(self._apply_filter)
         tb.addWidget(self.search_edit)
-        tb.addStretch(1)
-
         tb.addSpacing(8)
 
         # Кнопки действий
@@ -1692,24 +1755,43 @@ class MainWindow(QMainWindow):
         self.btn_types.clicked.connect(self._open_type_registry)
         tb.addWidget(self.btn_types)
 
-        # Разделитель
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.Shape.VLine)
-        sep2.setStyleSheet(f"color:{PALETTE['border']};")
-        tb.addWidget(sep2)
+        tb.addStretch(1)
+        outer.addLayout(tb)
 
-        # Переключатель вида
-        self.btn_view = btn("⊞", tooltip="Перемкнути вигляд: картки / таблиця")
-        self.btn_view.setFixedWidth(36)
+        # ── Рядок 2: перемикачі вигляду ──────────────────────────────────
+        tb2 = QHBoxLayout()
+        tb2.setSpacing(6)
+        tb2.setContentsMargins(0, 0, 0, 0)
+
+        # Перемикач вигляду
+        self.btn_view = btn("⊞  Список", tooltip="Перемкнути вигляд: картки / таблиця")
+        self.btn_view.setFixedHeight(26)
+        self.btn_view.setFixedWidth(100)
+        self.btn_view.setStyleSheet(
+            f"font-size:11px; padding:2px 8px;"
+            f"background:{PALETTE['bg_panel']}; color:{PALETTE['text_dim']};"
+            f"border:1px solid {PALETTE['border']}; border-radius:5px;"
+        )
         self.btn_view.clicked.connect(self._toggle_view)
-        tb.addWidget(self.btn_view)
+        tb2.addWidget(self.btn_view)
 
-        self.btn_browser = btn("🌐", tooltip="Показати/приховати вбудований браузер")
-        self.btn_browser.setFixedWidth(36)
+        # Кнопка браузера з анімацією
+        self.btn_browser = AnimatedButton("🌐  Браузер", SPINNER_GIF_B64)
+        self.btn_browser.setFixedHeight(26)
+        self.btn_browser.setFixedWidth(110)
+        self.btn_browser.setStyleSheet(
+            f"font-size:11px; padding:2px 8px;"
+            f"background:{PALETTE['bg_panel']}; color:{PALETTE['text_dim']};"
+            f"border:1px solid {PALETTE['border']}; border-radius:5px;"
+            f"text-align:left;"
+        )
         self.btn_browser.clicked.connect(self._toggle_browser)
-        tb.addWidget(self.btn_browser)
+        tb2.addWidget(self.btn_browser)
 
-        return tb
+        tb2.addStretch(1)
+        outer.addLayout(tb2)
+
+        return outer
 
     # ── Заполнение таблицы ────────────────────────────────────────────────────
 
@@ -1826,24 +1908,30 @@ class MainWindow(QMainWindow):
 
 
     def _open_in_browser(self, device: Device):
-        """Принудительно открыть устройство во встроенном браузере."""
+        """Примусово відкрити пристрій у вбудованому браузері."""
         if not self.browser_panel.isVisible():
             self.browser_panel.setVisible(True)
-            self.btn_browser.setText("✕")
+            self.btn_browser.setText("✕  Браузер")
+            self.btn_browser.start_anim()
         self.browser_panel.open_url(device.web_url(), device.name)
         if not WEBENGINE_AVAILABLE:
             self._log("WebEngine недоступний. pip install PyQt6-WebEngine", error=True)
 
     def _toggle_browser(self):
-        """Показать/скрыть панель встроенного браузера."""
+        """Показати/приховати панель вбудованого браузера."""
         visible = not self.browser_panel.isVisible()
         self.browser_panel.setVisible(visible)
-        self.btn_browser.setText("✕" if visible else "🌐")
-        if visible and not WEBENGINE_AVAILABLE:
-            self._log(
-                "WebEngine недоступен. Установите: pip install PyQt6-WebEngine",
-                error=True
-            )
+        if visible:
+            self.btn_browser.setText("✕  Браузер")
+            self.btn_browser.start_anim()
+            if not WEBENGINE_AVAILABLE:
+                self._log(
+                    "WebEngine недоступний. Встановіть: pip install PyQt6-WebEngine",
+                    error=True
+                )
+        else:
+            self.btn_browser.setText("🌐  Браузер")
+            self.btn_browser.stop_anim()
 
     def _open_type_registry(self):
         """Открыть диалог реестра типов. После закрытия — обновить комбо в диалогах."""
@@ -1870,7 +1958,7 @@ class MainWindow(QMainWindow):
         self.grid_scroll.setVisible(is_grid)
         self.table.setVisible(not is_grid)
         if hasattr(self, 'btn_view'):
-            self.btn_view.setText("≡" if is_grid else "⊞")
+            self.btn_view.setText("≡  Список" if is_grid else "⊞  Список")
 
     # ── Авто-апдейтер ─────────────────────────────────────────────────────────
 
