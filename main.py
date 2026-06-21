@@ -52,7 +52,7 @@ GITHUB_REPO   = "MuxaeLka/RaspbeNRK"
 GITHUB_API    = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 VIEW_GRID     = "grid"   # режим карточек
 VIEW_TABLE    = "table"  # режим таблицы
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.0.4"
 
 DEFAULT_DEVICES = [
     {"name": "NRK-1", "ip": "10.60.93.50", "port": 8080, "device_type": "raspberry"},
@@ -610,12 +610,11 @@ class DeviceDialog(QDialog):
             f"color:{PALETTE['text_main']}; selection-background-color:{PALETTE['bg_selected']};}}"
         )
 
-        # Тип устройства — заполняется из актуального реестра
+        # Тип устройства — заполняется динамически при открытии (см. showEvent)
         self.type_combo = QComboBox()
         self.type_combo.setStyleSheet(combo_style)
-        for key, val in DEVICE_TYPES.items():
-            self.type_combo.addItem(f"{val['icon']}  {val['label']}", key)
         self.type_combo.currentIndexChanged.connect(self._on_type_changed)
+        self._populate_type_combo()  # первичное заполнение
 
         # Индивидуальная иконка устройства
         self.icon_combo = QComboBox()
@@ -672,6 +671,28 @@ class DeviceDialog(QDialog):
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
         ok_btn.setObjectName("primary")
         layout.addWidget(buttons)
+
+    def _populate_type_combo(self):
+        """Заполнить type_combo из актуального DEVICE_TYPES.
+        Вызывается при создании и при каждом открытии диалога —
+        чтобы новые типы из реестра сразу появлялись в списке."""
+        # Запоминаем текущий выбор
+        current = self.type_combo.currentData()
+        self.type_combo.blockSignals(True)
+        self.type_combo.clear()
+        for key, val in DEVICE_TYPES.items():
+            self.type_combo.addItem(f"{val.get('icon', '📡')}  {val['label']}", key)
+        # Восстанавливаем выбор
+        if current:
+            idx = self.type_combo.findData(current)
+            if idx >= 0:
+                self.type_combo.setCurrentIndex(idx)
+        self.type_combo.blockSignals(False)
+
+    def showEvent(self, event):
+        """При каждом показе диалога обновляем список типов."""
+        self._populate_type_combo()
+        super().showEvent(event)
 
     def _on_type_changed(self, _idx: int):
         """При смене типа подставляем дефолтный порт и синхронизируем иконку."""
