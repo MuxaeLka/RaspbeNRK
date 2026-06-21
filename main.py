@@ -12,6 +12,14 @@ import webbrowser
 import threading
 import urllib.request
 import urllib.error
+
+# PyQt6-WebEngine — опциональная зависимость
+try:
+    from PyQt6.QtWebEngineWidgets import QWebEngineView
+    from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
+    WEBENGINE_AVAILABLE = True
+except ImportError:
+    WEBENGINE_AVAILABLE = False
 from pathlib import Path
 from datetime import datetime
 
@@ -20,7 +28,8 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QPushButton, QLineEdit, QLabel,
     QHeaderView, QDialog, QFormLayout, QDialogButtonBox, QTextEdit,
     QSplitter, QMessageBox, QMenu, QAbstractItemView, QStatusBar,
-    QFrame, QSizePolicy, QScrollArea, QGridLayout
+    QFrame, QSizePolicy, QScrollArea, QGridLayout,
+    QTabWidget, QTabBar, QToolButton
 )
 from PyQt6.QtCore import (
     Qt, QThread, pyqtSignal, QTimer, QSortFilterProxyModel,
@@ -43,7 +52,7 @@ GITHUB_REPO   = "MuxaeLka/RaspbeNRK"
 GITHUB_API    = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 VIEW_GRID     = "grid"   # режим карточек
 VIEW_TABLE    = "table"  # режим таблицы
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 
 DEFAULT_DEVICES = [
     {"name": "NRK-1", "ip": "10.60.93.50", "port": 8080, "device_type": "raspberry"},
@@ -341,6 +350,70 @@ QFrame#separator {{
     background-color: {PALETTE['border']};
     max-height: 1px;
     min-height: 1px;
+}}
+
+/* ── Браузерные вкладки ───────────────────────────────── */
+QTabWidget::pane {{
+    border: none;
+    background: {PALETTE['bg_deep']};
+}}
+
+QTabBar {{
+    background: {PALETTE['bg_panel']};
+}}
+
+QTabBar::tab {{
+    background: {PALETTE['bg_panel']};
+    color: {PALETTE['text_dim']};
+    border: none;
+    border-right: 1px solid {PALETTE['border']};
+    padding: 7px 14px;
+    font-size: 11px;
+    min-width: 120px;
+    max-width: 220px;
+}}
+
+QTabBar::tab:selected {{
+    background: {PALETTE['bg_deep']};
+    color: {PALETTE['text_main']};
+    border-bottom: 2px solid {PALETTE['accent']};
+}}
+
+QTabBar::tab:hover:!selected {{
+    background: {PALETTE['btn_hover']};
+    color: {PALETTE['text_main']};
+}}
+
+QTabBar::close-button {{
+    image: none;
+    subcontrol-position: right;
+}}
+
+QToolButton#nav_btn {{
+    background: {PALETTE['bg_panel']};
+    color: {PALETTE['text_main']};
+    border: none;
+    border-right: 1px solid {PALETTE['border']};
+    padding: 4px 10px;
+    font-size: 14px;
+}}
+
+QToolButton#nav_btn:hover {{
+    background: {PALETTE['btn_hover']};
+}}
+
+QLineEdit#url_bar {{
+    background: {PALETTE['bg_deep']};
+    color: {PALETTE['text_main']};
+    border: 1px solid {PALETTE['border']};
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+}}
+
+QLineEdit#url_bar:focus {{
+    border-color: {PALETTE['accent']};
 }}
 """
 
@@ -807,6 +880,207 @@ class UpdateChecker(QThread):
 
 
 
+
+# ─── Виджет вкладки встроенного браузера ──────────────────────────────────────
+
+class BrowserTab(QWidget):
+    """
+    Одна вкладка встроенного браузера.
+    Содержит адресную строку, кнопки навигации и QWebEngineView.
+    Если WebEngine недоступен — показывает заглушку с кнопкой открыть в браузере.
+    """
+    title_changed = pyqtSignal(str)   # для обновления заголовка вкладки
+
+    def __init__(self, url: str, device_name: str, parent=None):
+        super().__init__(parent)
+        self.url = url
+        self.device_name = device_name
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # ── Навигационная панель ───────────────────────────────────────────
+        nav_bar = QWidget()
+        nav_bar.setFixedHeight(36)
+        nav_bar.setStyleSheet(
+            f"background:{PALETTE['bg_panel']}; border-bottom:1px solid {PALETTE['border']};"
+        )
+        nav_layout = QHBoxLayout(nav_bar)
+        nav_layout.setContentsMargins(4, 2, 4, 2)
+        nav_layout.setSpacing(2)
+
+        def nav_btn(text, tooltip=""):
+            b = QToolButton()
+            b.setText(text)
+            b.setObjectName("nav_btn")
+            b.setFixedSize(32, 28)
+            if tooltip:
+                b.setToolTip(tooltip)
+            return b
+
+        self.btn_back    = nav_btn("←", "Назад")
+        self.btn_forward = nav_btn("→", "Вперёд")
+        self.btn_reload  = nav_btn("⟳", "Обновить")
+        self.btn_home    = nav_btn("⌂", "На главную")
+        nav_layout.addWidget(self.btn_back)
+        nav_layout.addWidget(self.btn_forward)
+        nav_layout.addWidget(self.btn_reload)
+        nav_layout.addWidget(self.btn_home)
+
+        self.url_bar = QLineEdit()
+        self.url_bar.setObjectName("url_bar")
+        self.url_bar.setText(url)
+        self.url_bar.returnPressed.connect(self._navigate_to_url)
+        nav_layout.addWidget(self.url_bar, stretch=1)
+
+        self.btn_external = nav_btn("⬡", "Открыть в системном браузере")
+        self.btn_external.clicked.connect(self._open_external)
+        nav_layout.addWidget(self.btn_external)
+
+        layout.addWidget(nav_bar)
+
+        # ── Контент ────────────────────────────────────────────────────────
+        if WEBENGINE_AVAILABLE:
+            self.view = QWebEngineView()
+            self.view.load(__import__('PyQt6.QtCore', fromlist=['QUrl']).QUrl(url))
+            self.view.urlChanged.connect(self._on_url_changed)
+            self.view.titleChanged.connect(self._on_title_changed)
+            self.view.loadProgress.connect(self._on_load_progress)
+
+            # Подключаем кнопки навигации
+            self.btn_back.clicked.connect(self.view.back)
+            self.btn_forward.clicked.connect(self.view.forward)
+            self.btn_reload.clicked.connect(self.view.reload)
+            self.btn_home.clicked.connect(lambda: self.view.load(
+                __import__('PyQt6.QtCore', fromlist=['QUrl']).QUrl(self.url)
+            ))
+            layout.addWidget(self.view)
+        else:
+            # Заглушка если PyQt6-WebEngine не установлен
+            placeholder = QWidget()
+            placeholder.setStyleSheet(f"background:{PALETTE['bg_deep']};")
+            ph_layout = QVBoxLayout(placeholder)
+            ph_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            ico = QLabel("🌐")
+            ico.setStyleSheet("font-size:48px; background:transparent;")
+            ico.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            ph_layout.addWidget(ico)
+
+            msg = QLabel(
+                "Встроенный браузер недоступен.\n\n"
+                "Установите PyQt6-WebEngine:\n"
+                "pip install PyQt6-WebEngine\n\n"
+                "или откройте в системном браузере:"
+            )
+            msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            msg.setStyleSheet(f"color:{PALETTE['text_dim']}; font-size:13px; background:transparent;")
+            ph_layout.addWidget(msg)
+
+            open_btn = QPushButton(f"Открыть {url}")
+            open_btn.setObjectName("primary")
+            open_btn.setFixedWidth(300)
+            open_btn.clicked.connect(self._open_external)
+            ph_layout.addWidget(open_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+
+            layout.addWidget(placeholder)
+            self.view = None
+
+            # Кнопки навигации недоступны без WebEngine
+            for b in [self.btn_back, self.btn_forward, self.btn_reload, self.btn_home]:
+                b.setEnabled(False)
+
+    def _navigate_to_url(self):
+        if self.view:
+            from PyQt6.QtCore import QUrl
+            url = self.url_bar.text().strip()
+            if not url.startswith("http"):
+                url = "http://" + url
+            self.view.load(QUrl(url))
+
+    def _on_url_changed(self, qurl):
+        self.url_bar.setText(qurl.toString())
+
+    def _on_title_changed(self, title: str):
+        # Обрезаем длинные заголовки для вкладки
+        short = (title[:18] + "…") if len(title) > 20 else title
+        self.title_changed.emit(short or self.device_name)
+
+    def _on_load_progress(self, progress: int):
+        # Показываем прогресс в адресной строке через placeholder
+        if progress < 100:
+            self.url_bar.setPlaceholderText(f"Загрузка {progress}%...")
+        else:
+            self.url_bar.setPlaceholderText("")
+
+    def _open_external(self):
+        import webbrowser as _wb
+        _wb.open(self.url_bar.text() or self.url)
+
+
+# ─── Панель встроенного браузера ──────────────────────────────────────────────
+
+class BrowserPanel(QWidget):
+    """
+    Панель встроенного браузера с вкладками.
+    Каждое устройство открывается в отдельной вкладке.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        self.tabs = QTabWidget()
+        self.tabs.setTabsClosable(True)
+        self.tabs.setMovable(True)
+        self.tabs.tabCloseRequested.connect(self._close_tab)
+        self.tabs.setStyleSheet("")  # используем глобальный QSS
+        layout.addWidget(self.tabs)
+
+        # Кнопка закрытия панели браузера
+        self._close_all_btn = QPushButton("✕  Закрыть браузер")
+        self._close_all_btn.setFixedHeight(28)
+        self._close_all_btn.setStyleSheet(
+            f"font-size:11px; color:{PALETTE['text_dim']};"
+            f"background:{PALETTE['bg_panel']}; border:none;"
+            f"border-top:1px solid {PALETTE['border']}; border-radius:0;"
+        )
+        self._close_all_btn.clicked.connect(self._do_hide)
+        layout.addWidget(self._close_all_btn)
+
+
+    def _do_hide(self):
+        self.setVisible(False)
+
+    def open_url(self, url: str, device_name: str):
+        """Открыть URL — если вкладка уже есть (по URL), переключиться на неё."""
+        # Ищем существующую вкладку
+        for i in range(self.tabs.count()):
+            tab = self.tabs.widget(i)
+            if isinstance(tab, BrowserTab) and tab.url == url:
+                self.tabs.setCurrentIndex(i)
+                return
+
+        # Создаём новую вкладку
+        tab = BrowserTab(url, device_name)
+        tab.title_changed.connect(lambda title, i=None: self._update_tab_title(tab, title))
+        idx = self.tabs.addTab(tab, f"⏳ {device_name}")
+        self.tabs.setCurrentIndex(idx)
+
+    def _update_tab_title(self, tab: "BrowserTab", title: str):
+        idx = self.tabs.indexOf(tab)
+        if idx >= 0:
+            self.tabs.setTabText(idx, title)
+
+    def _close_tab(self, idx: int):
+        widget = self.tabs.widget(idx)
+        self.tabs.removeTab(idx)
+        if widget:
+            widget.deleteLater()
+
+
 # ─── Диалог реестра типов устройств ───────────────────────────────────────────
 
 class TypeRegistryDialog(QDialog):
@@ -1136,6 +1410,8 @@ class MainWindow(QMainWindow):
 
         self._log("Приложение запущено.")
         self._log(f"Загружено устройств: {len(self.devices)}")
+        if not WEBENGINE_AVAILABLE:
+            self._log("Встроенный браузер недоступен. Установите: pip install PyQt6-WebEngine", error=True)
 
         # Проверка обновлений
         self._update_checker = UpdateChecker()
@@ -1188,10 +1464,30 @@ class MainWindow(QMainWindow):
         self.header = HeaderWidget()
         root.addWidget(self.header)
 
+        # Горизонтальный сплиттер: левая панель (таблица/grid) + браузер
+        self.h_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.h_splitter.setHandleWidth(4)
+        root.addWidget(self.h_splitter)
+
+        # Левая часть: вертикальный сплиттер (таблица + лог)
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
+
         # Сплиттер: таблица + лог
         splitter = QSplitter(Qt.Orientation.Vertical)
         splitter.setHandleWidth(4)
-        root.addWidget(splitter)
+        left_layout.addWidget(splitter)
+        self.h_splitter.addWidget(left_widget)
+
+        # Браузерная панель (справа, скрыта по умолчанию)
+        self.browser_panel = BrowserPanel()
+        self.browser_panel.setMinimumWidth(400)
+        self.browser_panel.setVisible(False)
+        self.h_splitter.addWidget(self.browser_panel)
+        self.h_splitter.setStretchFactor(0, 1)
+        self.h_splitter.setStretchFactor(1, 2)
 
         # Верхняя часть: тулбар + таблица
         top_widget = QWidget()
@@ -1352,6 +1648,11 @@ class MainWindow(QMainWindow):
         self.btn_view.clicked.connect(self._toggle_view)
         tb.addWidget(self.btn_view)
 
+        self.btn_browser = btn("🌐  Браузер", tooltip="Показать/скрыть встроенный браузер")
+        self.btn_browser.setFixedWidth(100)
+        self.btn_browser.clicked.connect(self._toggle_browser)
+        tb.addWidget(self.btn_browser)
+
         return tb
 
     # ── Заполнение таблицы ────────────────────────────────────────────────────
@@ -1467,6 +1768,26 @@ class MainWindow(QMainWindow):
 
     # ── Поиск ────────────────────────────────────────────────────────────────
 
+
+    def _open_in_browser(self, device: Device):
+        """Принудительно открыть устройство во встроенном браузере."""
+        if not self.browser_panel.isVisible():
+            self.browser_panel.setVisible(True)
+            self.btn_browser.setText("✕  Браузер")
+        self.browser_panel.open_url(device.web_url(), device.name)
+        if not WEBENGINE_AVAILABLE:
+            self._log("WebEngine недоступен. pip install PyQt6-WebEngine", error=True)
+
+    def _toggle_browser(self):
+        """Показать/скрыть панель встроенного браузера."""
+        visible = not self.browser_panel.isVisible()
+        self.browser_panel.setVisible(visible)
+        self.btn_browser.setText("✕  Браузер" if visible else "🌐  Браузер")
+        if visible and not WEBENGINE_AVAILABLE:
+            self._log(
+                "WebEngine недоступен. Установите: pip install PyQt6-WebEngine",
+                error=True
+            )
 
     def _open_type_registry(self):
         """Открыть диалог реестра типов. После закрытия — обновить комбо в диалогах."""
@@ -1607,7 +1928,12 @@ class MainWindow(QMainWindow):
     def _open_device(self, device: Device):
         url = device.web_url()
         self._log(f"Открываем: {url}")
-        webbrowser.open(url)
+        if hasattr(self, 'browser_panel') and self.browser_panel.isVisible():
+            # Открываем во встроенном браузере
+            self.browser_panel.open_url(url, device.name)
+        else:
+            # Системный браузер
+            webbrowser.open(url)
 
     def _open_all(self):
         """Открыть все онлайн-устройства (или все, если нет онлайн)."""
@@ -1633,6 +1959,14 @@ class MainWindow(QMainWindow):
         act_open = QAction(f"Открыть {device.name}", self)
         act_open.triggered.connect(lambda: self._open_device(device))
         menu.addAction(act_open)
+
+        act_open_ext = QAction("Открыть в системном браузере", self)
+        act_open_ext.triggered.connect(lambda: webbrowser.open(device.web_url()))
+        menu.addAction(act_open_ext)
+
+        act_open_int = QAction("Открыть во встроенном браузере", self)
+        act_open_int.triggered.connect(lambda: self._open_in_browser(device))
+        menu.addAction(act_open_int)
 
         act_check = QAction("Проверить сейчас", self)
         act_check.triggered.connect(lambda: self._check_device(device))
