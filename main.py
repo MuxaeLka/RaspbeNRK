@@ -75,7 +75,7 @@ VIEW_TABLE    = "table"  # режим таблицы
 
 # GIF-анімація спінера (base64, вбудована в код)
 SPINNER_GIF_B64 = "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"
-APP_VERSION = "1.1.2"
+APP_VERSION = "1.1.3"
 
 DEFAULT_DEVICES = [
     {"name": "NRK-1", "ip": "10.60.93.50", "port": 8080, "device_type": "raspberry"},
@@ -814,6 +814,8 @@ class DeviceDialog(QDialog):
             self.icon_combo.setCurrentIndex(idx)
 
     def _update_hint(self, _=None):
+        if not hasattr(self, "hint_lbl"):
+            return
         mode_label = PING_MODES.get(
             self.ping_combo.currentData() if hasattr(self, "ping_combo") else PING_MODE_TCP,
             "TCP connect"
@@ -1079,55 +1081,63 @@ class BrowserTab(QWidget):
 
         # ── Контент ────────────────────────────────────────────────────────
         if WEBENGINE_AVAILABLE:
-            # Lazy import — після того як QApplication вже існує
-            from PyQt6.QtWebEngineWidgets import QWebEngineView as _WebView
-            from PyQt6.QtCore import QUrl
-            self.view = _WebView()
-            self.view.load(QUrl(url))
-            self.view.urlChanged.connect(self._on_url_changed)
-            self.view.titleChanged.connect(self._on_title_changed)
-            self.view.loadProgress.connect(self._on_load_progress)
+            try:
+                # Lazy import — після того як QApplication вже існує
+                from PyQt6.QtWebEngineWidgets import QWebEngineView as _WebView
+                from PyQt6.QtCore import QUrl
+                self.view = _WebView()
+                self.view.load(QUrl(url))
+                self.view.urlChanged.connect(self._on_url_changed)
+                self.view.titleChanged.connect(self._on_title_changed)
+                self.view.loadProgress.connect(self._on_load_progress)
 
-            # Підключаємо кнопки навігації
-            self.btn_back.clicked.connect(self.view.back)
-            self.btn_forward.clicked.connect(self.view.forward)
-            self.btn_reload.clicked.connect(self.view.reload)
-            self.btn_home.clicked.connect(lambda: self.view.load(QUrl(self.url)))
-            layout.addWidget(self.view)
+                # Підключаємо кнопки навігації
+                self.btn_back.clicked.connect(self.view.back)
+                self.btn_forward.clicked.connect(self.view.forward)
+                self.btn_reload.clicked.connect(self.view.reload)
+                self.btn_home.clicked.connect(lambda: self.view.load(QUrl(self.url)))
+                layout.addWidget(self.view)
+            except Exception as _e:
+                # WebEngine встановлений але не може ініціалізуватись (напр. в EXE)
+                self.view = None
+                self._show_fallback(layout, url, str(_e))
         else:
-            # Заглушка если PyQt6-WebEngine не установлен
-            placeholder = QWidget()
-            placeholder.setStyleSheet(f"background:{PALETTE['bg_deep']};")
-            ph_layout = QVBoxLayout(placeholder)
-            ph_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-            ico = QLabel("🌐")
-            ico.setStyleSheet("font-size:48px; background:transparent;")
-            ico.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            ph_layout.addWidget(ico)
-
-            msg = QLabel(
-                "Вбудований браузер недоступний.\n\n"
-                "Встановіть PyQt6-WebEngine:\n"
-                "pip install PyQt6-WebEngine\n\n"
-                "або відкрийте у системному браузері:"
-            )
-            msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            msg.setStyleSheet(f"color:{PALETTE['text_dim']}; font-size:13px; background:transparent;")
-            ph_layout.addWidget(msg)
-
-            open_btn = QPushButton(f"Відкрити {url}")
-            open_btn.setObjectName("primary")
-            open_btn.setFixedWidth(300)
-            open_btn.clicked.connect(self._open_external)
-            ph_layout.addWidget(open_btn, alignment=Qt.AlignmentFlag.AlignCenter)
-
-            layout.addWidget(placeholder)
             self.view = None
+            self._show_fallback(layout, url, "PyQt6-WebEngine не встановлено")
 
-            # Кнопки навигации недоступны без WebEngine
-            for b in [self.btn_back, self.btn_forward, self.btn_reload, self.btn_home]:
-                b.setEnabled(False)
+    def _show_fallback(self, layout, url: str, reason: str = ""):
+        """Показати заглушку коли WebEngine недоступний або впав."""
+        for b in [self.btn_back, self.btn_forward, self.btn_reload, self.btn_home]:
+            b.setEnabled(False)
+
+        placeholder = QWidget()
+        placeholder.setStyleSheet(f"background:{PALETTE['bg_deep']};")
+        ph_layout = QVBoxLayout(placeholder)
+        ph_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        ico = QLabel("🌐")
+        ico.setStyleSheet("font-size:48px; background:transparent;")
+        ico.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        ph_layout.addWidget(ico)
+
+        msg_text = "Вбудований браузер недоступний."
+        if reason:
+            msg_text += f"\n\n{reason}"
+        msg_text += "\n\nВстановіть: pip install PyQt6-WebEngine\nабо відкрийте у системному браузері:"
+        msg = QLabel(msg_text)
+        msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        msg.setStyleSheet(
+            f"color:{PALETTE['text_dim']}; font-size:12px; background:transparent;"
+        )
+        msg.setWordWrap(True)
+        ph_layout.addWidget(msg)
+
+        open_btn = QPushButton(f"Відкрити {url}")
+        open_btn.setObjectName("primary")
+        open_btn.setFixedWidth(300)
+        open_btn.clicked.connect(self._open_external)
+        ph_layout.addWidget(open_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(placeholder)
 
     def _navigate_to_url(self):
         if self.view:
