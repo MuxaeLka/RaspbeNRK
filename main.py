@@ -13,6 +13,13 @@ import threading
 import urllib.request
 import urllib.error
 import subprocess
+import sys
+def excepthook(exc_type, exc_value, exc_tb):
+    import traceback
+    with open("crash.log", "a") as f:
+        traceback.print_exception(exc_type, exc_value, exc_tb, file=f)
+    print("CRASH:", exc_value)
+sys.excepthook = excepthook
 
 # PyQt6-WebEngine — перевіряємо наявність без імпорту
 # Реальний імпорт відбувається в BrowserTab ПІСЛЯ створення QApplication
@@ -30,7 +37,7 @@ from PyQt6.QtWidgets import (
     QHeaderView, QDialog, QFormLayout, QDialogButtonBox, QTextEdit,
     QSplitter, QMessageBox, QMenu, QAbstractItemView, QStatusBar,
     QFrame, QSizePolicy, QScrollArea, QGridLayout,
-    QTabWidget, QTabBar, QToolButton
+    QTabWidget, QTabBar, QToolButton, QComboBox
 )
 from PyQt6.QtCore import (
     Qt, QThread, pyqtSignal, QTimer, QSortFilterProxyModel,
@@ -68,7 +75,7 @@ VIEW_TABLE    = "table"  # режим таблицы
 
 # GIF-анімація спінера (base64, вбудована в код)
 SPINNER_GIF_B64 = "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"
-APP_VERSION = "1.1.1"
+APP_VERSION = "1.1.2"
 
 DEFAULT_DEVICES = [
     {"name": "NRK-1", "ip": "10.60.93.50", "port": 8080, "device_type": "raspberry"},
@@ -684,8 +691,7 @@ class DeviceDialog(QDialog):
         self.port_edit = QLineEdit()
         self.port_edit.setPlaceholderText("8080")
 
-        # Выбор типа устройства — два радио-подобных кнопки
-        from PyQt6.QtWidgets import QComboBox
+        # Вибір типу пристрою
         combo_style = (
             f"QComboBox {{ background:{PALETTE['bg_panel']}; color:{PALETTE['text_main']};"
             f"border:1px solid {PALETTE['border']}; border-radius:6px; padding:6px 10px;}}"
@@ -708,6 +714,13 @@ class DeviceDialog(QDialog):
         for ico in ICON_OPTIONS:
             self.icon_combo.addItem(ico, ico)
 
+        # Режим пінгу
+        self.ping_combo = QComboBox()
+        self.ping_combo.setStyleSheet(combo_style)
+        for key, label in PING_MODES.items():
+            self.ping_combo.addItem(label, key)
+        self.ping_combo.currentIndexChanged.connect(self._update_hint)
+
         if device:
             self.name_edit.setText(device.name)
             self.ip_edit.setText(device.ip)
@@ -715,13 +728,14 @@ class DeviceDialog(QDialog):
             idx = self.type_combo.findData(device.device_type)
             if idx >= 0:
                 self.type_combo.setCurrentIndex(idx)
-            # Иконка устройства
             ico_idx = self.icon_combo.findData(getattr(device, "icon", device.type_icon()))
             if ico_idx >= 0:
                 self.icon_combo.setCurrentIndex(ico_idx)
+            pm_idx = self.ping_combo.findData(getattr(device, "ping_mode", PING_MODE_TCP))
+            if pm_idx >= 0:
+                self.ping_combo.setCurrentIndex(pm_idx)
         else:
             self.port_edit.setText("8080")
-            # Дефолтная иконка по типу
             self._sync_icon_from_type()
 
         def lbl(text):
@@ -729,16 +743,17 @@ class DeviceDialog(QDialog):
             l.setStyleSheet(f"color:{PALETTE['text_dim']};")
             return l
 
-        # Иконка + тип в одну строку
+        # Іконка + тип в один рядок
         type_row = QHBoxLayout()
         type_row.setSpacing(8)
         type_row.addWidget(self.icon_combo)
         type_row.addWidget(self.type_combo)
 
-        form.addRow(lbl("Назва:"),  self.name_edit)
-        form.addRow(lbl("IP-адреса:"),  self.ip_edit)
-        form.addRow(lbl("Порт:"),      self.port_edit)
+        form.addRow(lbl("Назва:"),        self.name_edit)
+        form.addRow(lbl("IP-адреса:"),    self.ip_edit)
+        form.addRow(lbl("Порт:"),         self.port_edit)
         form.addRow(lbl("Тип / іконка:"), type_row)
+        form.addRow(lbl("Перевірка:"),    self.ping_combo)
         layout.addLayout(form)
 
         # Подсказка под формой
@@ -798,7 +813,7 @@ class DeviceDialog(QDialog):
         if idx >= 0:
             self.icon_combo.setCurrentIndex(idx)
 
-    def _update_hint(self):
+    def _update_hint(self, _=None):
         mode_label = PING_MODES.get(
             self.ping_combo.currentData() if hasattr(self, "ping_combo") else PING_MODE_TCP,
             "TCP connect"
@@ -2304,7 +2319,7 @@ class MainWindow(QMainWindow):
 
         # Ждём завершения потоков (с таймаутом)
         for w in workers:
-            w.wait(msecs=3000)
+            w.wait(3000)
 
         self._save_config()
         event.accept()

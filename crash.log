@@ -1,0 +1,128 @@
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 2225, in _add_device
+    name, ip, port, dtype, icon, ping_mode = dlg.get_values()
+                                             ~~~~~~~~~~~~~~^^
+  File "E:\RaspbeNRK\main.py", line 840, in get_values
+    self.ping_combo.currentData(),
+    ^^^^^^^^^^^^^^^
+AttributeError: 'DeviceDialog' object has no attribute 'ping_combo'
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 2244, in _edit_device
+    new_name, new_ip, new_port, new_type, new_icon, new_ping = dlg.get_values()
+                                                               ~~~~~~~~~~~~~~^^
+  File "E:\RaspbeNRK\main.py", line 840, in get_values
+    self.ping_combo.currentData(),
+    ^^^^^^^^^^^^^^^
+AttributeError: 'DeviceDialog' object has no attribute 'ping_combo'
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 1320, in _add_type
+    dlg = AddTypeDialog(self)
+  File "E:\RaspbeNRK\main.py", line 1410, in __init__
+    self.icon_combo = QComboBox()
+                      ^^^^^^^^^
+NameError: name 'QComboBox' is not defined
+Traceback (most recent call last):
+  File "E:\RaspbeNRK\main.py", line 2314, in closeEvent
+    w.wait(msecs=3000)
+    ~~~~~~^^^^^^^^^^^^
+TypeError: arguments did not match any overloaded call:
+  wait(self, deadline: QDeadlineTimer = QDeadlineTimer(QDeadlineTimer.Forever)): 'msecs' is not a valid keyword argument
+  wait(self, time: int): 'msecs' is not a valid keyword argument

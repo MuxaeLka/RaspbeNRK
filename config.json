@@ -47,14 +47,6 @@
       "device_type": "raspberry",
       "icon": "",
       "ping_mode": "tcp"
-    },
-    {
-      "name": "NRK-7",
-      "ip": "10.60.93.56",
-      "port": 8080,
-      "device_type": "raspberry",
-      "icon": "",
-      "ping_mode": "tcp"
     }
   ],
   "device_types": {}
