@@ -52,7 +52,7 @@ GITHUB_REPO   = "MuxaeLka/RaspbeNRK"
 GITHUB_API    = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 VIEW_GRID     = "grid"   # режим карточек
 VIEW_TABLE    = "table"  # режим таблицы
-APP_VERSION = "1.0.5"
+APP_VERSION = "1.0.6"
 
 DEFAULT_DEVICES = [
     {"name": "NRK-1", "ip": "10.60.93.50", "port": 8080, "device_type": "raspberry"},
@@ -573,7 +573,7 @@ class PingWorker(QThread):
 class DeviceDialog(QDialog):
     def __init__(self, parent=None, device: Device | None = None):
         super().__init__(parent)
-        self.setWindowTitle("Устройство" if device is None else "Редактировать устройство")
+        self.setWindowTitle("Пристрій" if device is None else "Редагувати пристрій")
         self.setModal(True)
         self.setMinimumWidth(360)
         self.setStyleSheet(QSS)
@@ -582,7 +582,7 @@ class DeviceDialog(QDialog):
         layout.setSpacing(16)
         layout.setContentsMargins(20, 20, 20, 20)
 
-        title = QLabel("Добавить устройство" if device is None else "Изменить устройство")
+        title = QLabel("Додати пристрій" if device is None else "Змінити пристрій")
         title.setObjectName("heading")
         title.setStyleSheet(f"font-size:15px; font-weight:700; color:{PALETTE['text_main']};")
         layout.addWidget(title)
@@ -650,10 +650,10 @@ class DeviceDialog(QDialog):
         type_row.addWidget(self.icon_combo)
         type_row.addWidget(self.type_combo)
 
-        form.addRow(lbl("Название:"),  self.name_edit)
-        form.addRow(lbl("IP-адрес:"),  self.ip_edit)
+        form.addRow(lbl("Назва:"),  self.name_edit)
+        form.addRow(lbl("IP-адреса:"),  self.ip_edit)
         form.addRow(lbl("Порт:"),      self.port_edit)
-        form.addRow(lbl("Тип / иконка:"), type_row)
+        form.addRow(lbl("Тип / іконка:"), type_row)
         layout.addLayout(form)
 
         # Подсказка под формой
@@ -717,13 +717,13 @@ class DeviceDialog(QDialog):
         dtype = self.type_combo.currentData()
         if dtype == "mikrotik":
             self.hint_lbl.setText(
-                "Двойной клик открывает winbox://IP  •  "
-                "Проверка: TCP-connect на указанный порт"
+                "Подвійний клік відкриває winbox://IP  •  "
+                "Перевірка: TCP-connect на вказаний порт"
             )
         else:
             self.hint_lbl.setText(
-                "Двойной клик открывает http://IP:PORT  •  "
-                "Проверка: TCP-connect на указанный порт"
+                "Подвійний клік відкриває http://IP:PORT  •  "
+                "Перевірка: TCP-connect на вказаний порт"
             )
 
     def _on_accept(self):
@@ -731,14 +731,14 @@ class DeviceDialog(QDialog):
         ip   = self.ip_edit.text().strip()
         port = self.port_edit.text().strip()
         if not name or not ip or not port:
-            QMessageBox.warning(self, "Ошибка", "Заполните все поля.")
+            QMessageBox.warning(self, "Ошибка", "Заповніть усі поля.")
             return
         parts = ip.split(".")
         if len(parts) != 4 or not all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
-            QMessageBox.warning(self, "Ошибка", "Некорректный IP-адрес.")
+            QMessageBox.warning(self, "Ошибка", "Некоректна IP-адреса.")
             return
         if not port.isdigit() or not (1 <= int(port) <= 65535):
-            QMessageBox.warning(self, "Ошибка", "Порт должен быть числом от 1 до 65535.")
+            QMessageBox.warning(self, "Ошибка", "Порт має бути числом від 1 до 65535.")
             return
         self.accept()
 
@@ -833,7 +833,7 @@ class DeviceCard(QFrame):
 
         # Статус и свечение
         if d.online is None:
-            self._ping_lbl.setText("⏳ проверка...")
+            self._ping_lbl.setText("⏳ перевірка...")
             self._ping_lbl.setStyleSheet(f"color:{PALETTE['text_dim']}; background:transparent;")
             self._set_glow("none")
             self._blink_timer.stop()
@@ -950,9 +950,9 @@ class BrowserTab(QWidget):
             return b
 
         self.btn_back    = nav_btn("←", "Назад")
-        self.btn_forward = nav_btn("→", "Вперёд")
+        self.btn_forward = nav_btn("→", "Вперед")
         self.btn_reload  = nav_btn("⟳", "Обновить")
-        self.btn_home    = nav_btn("⌂", "На главную")
+        self.btn_home    = nav_btn("⌂", "На головну")
         nav_layout.addWidget(self.btn_back)
         nav_layout.addWidget(self.btn_forward)
         nav_layout.addWidget(self.btn_reload)
@@ -964,7 +964,7 @@ class BrowserTab(QWidget):
         self.url_bar.returnPressed.connect(self._navigate_to_url)
         nav_layout.addWidget(self.url_bar, stretch=1)
 
-        self.btn_external = nav_btn("⬡", "Открыть в системном браузере")
+        self.btn_external = nav_btn("⬡", "Відкрити у системному браузері")
         self.btn_external.clicked.connect(self._open_external)
         nav_layout.addWidget(self.btn_external)
 
@@ -999,16 +999,16 @@ class BrowserTab(QWidget):
             ph_layout.addWidget(ico)
 
             msg = QLabel(
-                "Встроенный браузер недоступен.\n\n"
-                "Установите PyQt6-WebEngine:\n"
+                "Вбудований браузер недоступний.\n\n"
+                "Встановіть PyQt6-WebEngine:\n"
                 "pip install PyQt6-WebEngine\n\n"
-                "или откройте в системном браузере:"
+                "або відкрийте у системному браузері:"
             )
             msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
             msg.setStyleSheet(f"color:{PALETTE['text_dim']}; font-size:13px; background:transparent;")
             ph_layout.addWidget(msg)
 
-            open_btn = QPushButton(f"Открыть {url}")
+            open_btn = QPushButton(f"Відкрити {url}")
             open_btn.setObjectName("primary")
             open_btn.setFixedWidth(300)
             open_btn.clicked.connect(self._open_external)
@@ -1070,7 +1070,7 @@ class BrowserPanel(QWidget):
         layout.addWidget(self.tabs)
 
         # Кнопка закрытия панели браузера
-        self._close_all_btn = QPushButton("✕  Закрыть браузер")
+        self._close_all_btn = QPushButton("✕  Закрити браузер")
         self._close_all_btn.setFixedHeight(28)
         self._close_all_btn.setStyleSheet(
             f"font-size:11px; color:{PALETTE['text_dim']};"
@@ -1121,7 +1121,7 @@ class TypeRegistryDialog(QDialog):
     """
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Реестр типов устройств")
+        self.setWindowTitle("Реєстр типів пристроїв")
         self.setModal(True)
         self.setMinimumSize(500, 380)
         self.setStyleSheet(QSS)
@@ -1131,12 +1131,12 @@ class TypeRegistryDialog(QDialog):
         layout.setSpacing(12)
 
         # Заголовок
-        title = QLabel("Типы устройств")
+        title = QLabel("Типи пристроїв")
         title.setStyleSheet(f"font-size:15px; font-weight:700; color:{PALETTE['text_main']};")
         layout.addWidget(title)
 
-        sub = QLabel("Встроенные типы защищены от удаления. "
-                     "Добавленные типы сохраняются в config.json.")
+        sub = QLabel("Вбудовані типи захищені від видалення. "
+                     "Додані типи зберігаються в config.json.")
         sub.setStyleSheet(f"font-size:11px; color:{PALETTE['text_dim']};")
         sub.setWordWrap(True)
         layout.addWidget(sub)
@@ -1144,7 +1144,7 @@ class TypeRegistryDialog(QDialog):
         # Таблица типов
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["ID", "Название", "Иконка", "Порт", "Цвет"])
+        self.table.setHorizontalHeaderLabels(["ID", "Назва", "Іконка", "Порт", "Колір"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
@@ -1161,15 +1161,15 @@ class TypeRegistryDialog(QDialog):
 
         # Кнопки
         btn_row = QHBoxLayout()
-        self.btn_add = QPushButton("+ Добавить тип")
+        self.btn_add = QPushButton("+ Додати тип")
         self.btn_add.clicked.connect(self._add_type)
-        self.btn_del = QPushButton("Удалить")
+        self.btn_del = QPushButton("Видалити")
         self.btn_del.setObjectName("danger")
         self.btn_del.clicked.connect(self._delete_type)
         btn_row.addWidget(self.btn_add)
         btn_row.addWidget(self.btn_del)
         btn_row.addStretch()
-        close_btn = QPushButton("Закрыть")
+        close_btn = QPushButton("Закрити")
         close_btn.setObjectName("primary")
         close_btn.clicked.connect(self.accept)
         btn_row.addWidget(close_btn)
@@ -1237,13 +1237,13 @@ class TypeRegistryDialog(QDialog):
             return
         key = self.table.item(row, 0).text()
         if key in BUILTIN_TYPES:
-            QMessageBox.warning(self, "Защищено",
-                                f"Тип '{key}' встроенный и не может быть удалён.")
+            QMessageBox.warning(self, "Захищено",
+                                f"Тип '{key}' вбудований і не може бути видалений.")
             return
         reply = QMessageBox.question(
-            self, "Удалить тип",
-            f"Удалить тип '{key}'?\n\n"
-            f"Устройства с этим типом сохранят тип как ID.",
+            self, "Видалити тип",
+            f"Видалити тип '{key}'?\n\n"
+            f"Пристрої з цим типом збережуть тип як ID.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
@@ -1264,7 +1264,7 @@ class AddTypeDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Добавить тип устройства")
+        self.setWindowTitle("Додати тип пристрою")
         self.setModal(True)
         self.setMinimumWidth(360)
         self.setStyleSheet(QSS)
@@ -1273,7 +1273,7 @@ class AddTypeDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
 
-        title = QLabel("Новый тип устройства")
+        title = QLabel("Новий тип пристрою")
         title.setStyleSheet(f"font-size:14px; font-weight:700; color:{PALETTE['text_main']};")
         layout.addWidget(title)
 
@@ -1288,11 +1288,11 @@ class AddTypeDialog(QDialog):
 
         self.id_edit = QLineEdit()
         self.id_edit.setPlaceholderText("camera, switch, sensor ...")
-        form.addRow(lbl("ID (латиница):"), self.id_edit)
+        form.addRow(lbl("ID (латиниця):"), self.id_edit)
 
         self.label_edit = QLineEdit()
         self.label_edit.setPlaceholderText("IP Camera")
-        form.addRow(lbl("Название:"), self.label_edit)
+        form.addRow(lbl("Назва:"), self.label_edit)
 
         self.port_edit = QLineEdit()
         self.port_edit.setPlaceholderText("80")
@@ -1311,7 +1311,7 @@ class AddTypeDialog(QDialog):
         self.icon_combo.setStyleSheet(combo_style)
         for ico in ICON_OPTIONS:
             self.icon_combo.addItem(ico, ico)
-        form.addRow(lbl("Иконка:"), self.icon_combo)
+        form.addRow(lbl("Іконка:"), self.icon_combo)
 
         # Цвет
         self.color_combo = QComboBox()
@@ -1322,7 +1322,7 @@ class AddTypeDialog(QDialog):
             self.color_combo.setItemData(
                 idx, QBrush(QColor(color)), Qt.ItemDataRole.ForegroundRole
             )
-        form.addRow(lbl("Цвет:"), self.color_combo)
+        form.addRow(lbl("Колір:"), self.color_combo)
 
         layout.addLayout(form)
 
@@ -1339,14 +1339,14 @@ class AddTypeDialog(QDialog):
         label = self.label_edit.text().strip()
         port = self.port_edit.text().strip()
         if not key or not label:
-            QMessageBox.warning(self, "Ошибка", "Заполните ID и название.")
+            QMessageBox.warning(self, "Ошибка", "Заповніть ID та назву.")
             return
         if not key.isidentifier():
             QMessageBox.warning(self, "Ошибка",
-                                "ID должен содержать только латинские буквы, цифры и _")
+                                "ID має містити лише латинські літери, цифри та _")
             return
         if not port.isdigit() or not (1 <= int(port) <= 65535):
-            QMessageBox.warning(self, "Ошибка", "Порт: число от 1 до 65535.")
+            QMessageBox.warning(self, "Ошибка", "Порт: число від 1 до 65535.")
             return
         self.accept()
 
@@ -1377,13 +1377,12 @@ class HeaderWidget(QWidget):
         # Иконка — создаём через QPixmap напрямую без make_app_icon()
         # чтобы не зависеть от порядка инициализации QApplication
         icon_lbl = QLabel()
-        icon_lbl.setFixedSize(32, 32)
-        icon_lbl.setStyleSheet(
-            f"background:{PALETTE['accent']}; border-radius:8px;"
-            f"color:#ffffff; font-size:16px; font-weight:700;"
-        )
+        icon_lbl.setFixedSize(36, 36)
         icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_lbl.setText("N")
+        icon_lbl.setStyleSheet("background:transparent;")
+        # Загружаем иконку из того же места что и make_app_icon()
+        _app_icon = make_app_icon()
+        icon_lbl.setPixmap(_app_icon.pixmap(32, 32))
         row.addWidget(icon_lbl)
 
         # Текстовый блок
@@ -1408,7 +1407,7 @@ class HeaderWidget(QWidget):
         row.addStretch()
 
         # Статус онлайн
-        self.status_lbl = QLabel("● Ожидание...")
+        self.status_lbl = QLabel("● Очікування...")
         self.status_lbl.setFixedHeight(24)
         self.status_lbl.setStyleSheet(
             f"color:{PALETTE['text_dim']}; font-size:12px;"
@@ -1463,10 +1462,10 @@ class MainWindow(QMainWindow):
         # Сразу запускаем проверку при старте
         QTimer.singleShot(300, self._check_all)
 
-        self._log("Приложение запущено.")
-        self._log(f"Загружено устройств: {len(self.devices)}")
+        self._log("Застосунок запущено.")
+        self._log(f"Завантажено пристроїв: {len(self.devices)}")
         if not WEBENGINE_AVAILABLE:
-            self._log("Встроенный браузер недоступен. Установите: pip install PyQt6-WebEngine", error=True)
+            self._log("Вбудований браузер недоступний. Встановіть: pip install PyQt6-WebEngine", error=True)
 
         # Проверка обновлений
         self._update_checker = UpdateChecker()
@@ -1571,7 +1570,7 @@ class MainWindow(QMainWindow):
         # ── Таблица
         self.table = QTableWidget()
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["Название", "IP-адрес", "Тип", "Статус", "Отклик (мс)", "Последняя проверка"])
+        self.table.setHorizontalHeaderLabels(["Назва", "IP-адреса", "Тип", "Статус", "Відгук (мс)", "Остання перевірка"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
@@ -1603,14 +1602,14 @@ class MainWindow(QMainWindow):
         log_layout.setSpacing(6)
 
         log_header = QHBoxLayout()
-        log_title = QLabel("ЖУРНАЛ СОБЫТИЙ")
+        log_title = QLabel("ЖУРНАЛ ПОДІЙ")
         log_title.setObjectName("section_title")
         log_title.setStyleSheet(
             f"font-size:10px; font-weight:600; color:{PALETTE['text_dim']}; letter-spacing:0.8px;"
         )
         log_header.addWidget(log_title)
         log_header.addStretch()
-        clear_btn = QPushButton("Очистить")
+        clear_btn = QPushButton("Очистити")
         clear_btn.setFixedHeight(24)
         clear_btn.setStyleSheet(
             f"font-size:11px; padding:2px 10px; color:{PALETTE['text_dim']};"
@@ -1640,10 +1639,12 @@ class MainWindow(QMainWindow):
 
         # Поиск
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("🔍  Поиск по имени или IP...")
+        self.search_edit.setPlaceholderText("🔍  Пошук за іменем або IP...")
         self.search_edit.setFixedHeight(32)
+        self.search_edit.setMaximumWidth(260)
         self.search_edit.textChanged.connect(self._apply_filter)
-        tb.addWidget(self.search_edit, stretch=1)
+        tb.addWidget(self.search_edit)
+        tb.addStretch(1)
 
         tb.addSpacing(8)
 
@@ -1657,15 +1658,15 @@ class MainWindow(QMainWindow):
                 b.setToolTip(tooltip)
             return b
 
-        self.btn_open = btn("Открыть", "primary", "Открыть веб-интерфейс выбранного устройства")
+        self.btn_open = btn("Відкрити", "primary", "Відкрити веб-інтерфейс обраного пристрою")
         self.btn_open.clicked.connect(self._open_selected)
         tb.addWidget(self.btn_open)
 
-        self.btn_open_all = btn("Открыть все", tooltip="Открыть веб-интерфейсы всех онлайн-устройств")
+        self.btn_open_all = btn("Відкрити всі", tooltip="Відкрити веб-інтерфейси всіх онлайн-пристроїв")
         self.btn_open_all.clicked.connect(self._open_all)
         tb.addWidget(self.btn_open_all)
 
-        self.btn_refresh = btn("⟳  Обновить", tooltip="Немедленно проверить все устройства")
+        self.btn_refresh = btn("⟳  Оновити", tooltip="Негайно перевірити всі пристрої")
         self.btn_refresh.clicked.connect(self._check_all)
         tb.addWidget(self.btn_refresh)
 
@@ -1675,19 +1676,19 @@ class MainWindow(QMainWindow):
         sep.setStyleSheet(f"color:{PALETTE['border']};")
         tb.addWidget(sep)
 
-        self.btn_add = btn("+ Добавить", tooltip="Добавить новое устройство")
+        self.btn_add = btn("+ Додати", tooltip="Додати новий пристрій")
         self.btn_add.clicked.connect(self._add_device)
         tb.addWidget(self.btn_add)
 
-        self.btn_edit = btn("Изменить", tooltip="Редактировать выбранное устройство")
+        self.btn_edit = btn("Змінити", tooltip="Редагувати обраний пристрій")
         self.btn_edit.clicked.connect(self._edit_device)
         tb.addWidget(self.btn_edit)
 
-        self.btn_del = btn("Удалить", "danger", "Удалить выбранное устройство")
+        self.btn_del = btn("Видалити", "danger", "Видалити обраний пристрій")
         self.btn_del.clicked.connect(self._delete_device)
         tb.addWidget(self.btn_del)
 
-        self.btn_types = btn("⚙ Типы", tooltip="Управление реестром типов устройств")
+        self.btn_types = btn("⚙ Типи", tooltip="Керування реєстром типів пристроїв")
         self.btn_types.clicked.connect(self._open_type_registry)
         tb.addWidget(self.btn_types)
 
@@ -1698,13 +1699,13 @@ class MainWindow(QMainWindow):
         tb.addWidget(sep2)
 
         # Переключатель вида
-        self.btn_view = btn("⊞  Grid", tooltip="Переключить вид: карточки / таблица")
-        self.btn_view.setFixedWidth(80)
+        self.btn_view = btn("⊞", tooltip="Перемкнути вигляд: картки / таблиця")
+        self.btn_view.setFixedWidth(36)
         self.btn_view.clicked.connect(self._toggle_view)
         tb.addWidget(self.btn_view)
 
-        self.btn_browser = btn("🌐  Браузер", tooltip="Показать/скрыть встроенный браузер")
-        self.btn_browser.setFixedWidth(100)
+        self.btn_browser = btn("🌐", tooltip="Показати/приховати вбудований браузер")
+        self.btn_browser.setFixedWidth(36)
         self.btn_browser.clicked.connect(self._toggle_browser)
         tb.addWidget(self.btn_browser)
 
@@ -1781,7 +1782,7 @@ class MainWindow(QMainWindow):
         Колонки: 0=Название, 1=IP, 2=Тип, 3=Статус, 4=Отклик, 5=Время"""
         # Статус (col 3)
         if device.online is None:
-            status_text = "⏳  Проверка..."
+            status_text = "⏳  Перевірка..."
             status_color = PALETTE["text_dim"]
         elif device.online:
             status_text = "●  Онлайн"
@@ -1828,16 +1829,16 @@ class MainWindow(QMainWindow):
         """Принудительно открыть устройство во встроенном браузере."""
         if not self.browser_panel.isVisible():
             self.browser_panel.setVisible(True)
-            self.btn_browser.setText("✕  Браузер")
+            self.btn_browser.setText("✕")
         self.browser_panel.open_url(device.web_url(), device.name)
         if not WEBENGINE_AVAILABLE:
-            self._log("WebEngine недоступен. pip install PyQt6-WebEngine", error=True)
+            self._log("WebEngine недоступний. pip install PyQt6-WebEngine", error=True)
 
     def _toggle_browser(self):
         """Показать/скрыть панель встроенного браузера."""
         visible = not self.browser_panel.isVisible()
         self.browser_panel.setVisible(visible)
-        self.btn_browser.setText("✕  Браузер" if visible else "🌐  Браузер")
+        self.btn_browser.setText("✕" if visible else "🌐")
         if visible and not WEBENGINE_AVAILABLE:
             self._log(
                 "WebEngine недоступен. Установите: pip install PyQt6-WebEngine",
@@ -1850,7 +1851,7 @@ class MainWindow(QMainWindow):
         dlg.exec()
         # Сохраняем новые типы в конфиг
         self._save_config()
-        self._log(f"Реестр типов обновлён. Типов: {len(DEVICE_TYPES)}")
+        self._log(f"Реєстр типів оновлено. Типів: {len(DEVICE_TYPES)}")
 
     # ── Переключение вида ─────────────────────────────────────────────────────
 
@@ -1869,19 +1870,19 @@ class MainWindow(QMainWindow):
         self.grid_scroll.setVisible(is_grid)
         self.table.setVisible(not is_grid)
         if hasattr(self, 'btn_view'):
-            self.btn_view.setText("≡  Table" if is_grid else "⊞  Grid")
+            self.btn_view.setText("≡" if is_grid else "⊞")
 
     # ── Авто-апдейтер ─────────────────────────────────────────────────────────
 
     def _on_update_available(self, version: str, url: str):
         """Показываем уведомление о новой версии."""
-        self._log(f"Доступна новая версия v{version}!", error=False)
+        self._log(f"Доступна нова версія v{version}!", error=False)
         reply = QMessageBox.question(
             self,
-            "Обновление доступно",
-            f"Доступна версия v{version}.\n\n"
-            f"Текущая версия: v{APP_VERSION}\n\n"
-            f"Открыть страницу загрузки?",
+            "Оновлення доступне",
+            f"Доступна версія v{version}.\n\n"
+            f"Поточна версія: v{APP_VERSION}\n\n"
+            f"Відкрити сторінку завантаження?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
@@ -1957,7 +1958,7 @@ class MainWindow(QMainWindow):
         self.header.set_status(online_count, len(self.devices))
         ts = datetime.now().strftime("%H:%M:%S")
         self.statusbar.showMessage(
-            f"Онлайн: {online_count}/{len(self.devices)}  |  Обновлено: {ts}"
+            f"Онлайн: {online_count}/{len(self.devices)}  |  Оновлено: {ts}"
         )
 
     # ── Открытие браузера ─────────────────────────────────────────────────────
@@ -1976,13 +1977,13 @@ class MainWindow(QMainWindow):
     def _open_selected(self):
         device = self._get_selected_device()
         if not device:
-            QMessageBox.information(self, "Нет выбора", "Выберите устройство в таблице.")
+            QMessageBox.information(self, "Нічого не обрано", "Оберіть пристрій у таблиці.")
             return
         self._open_device(device)
 
     def _open_device(self, device: Device):
         url = device.web_url()
-        self._log(f"Открываем: {url}")
+        self._log(f"Відкриваємо: {url}")
         if hasattr(self, 'browser_panel') and self.browser_panel.isVisible():
             # Открываем во встроенном браузере
             self.browser_panel.open_url(url, device.name)
@@ -2011,29 +2012,29 @@ class MainWindow(QMainWindow):
             return
 
         menu = QMenu(self)
-        act_open = QAction(f"Открыть {device.name}", self)
+        act_open = QAction(f"Відкрити {device.name}", self)
         act_open.triggered.connect(lambda: self._open_device(device))
         menu.addAction(act_open)
 
-        act_open_ext = QAction("Открыть в системном браузере", self)
+        act_open_ext = QAction("Відкрити у системному браузері", self)
         act_open_ext.triggered.connect(lambda: webbrowser.open(device.web_url()))
         menu.addAction(act_open_ext)
 
-        act_open_int = QAction("Открыть во встроенном браузере", self)
+        act_open_int = QAction("Відкрити у вбудованому браузері", self)
         act_open_int.triggered.connect(lambda: self._open_in_browser(device))
         menu.addAction(act_open_int)
 
-        act_check = QAction("Проверить сейчас", self)
+        act_check = QAction("Перевірити зараз", self)
         act_check.triggered.connect(lambda: self._check_device(device))
         menu.addAction(act_check)
 
         menu.addSeparator()
 
-        act_edit = QAction("Редактировать...", self)
+        act_edit = QAction("Редагувати...", self)
         act_edit.triggered.connect(self._edit_device)
         menu.addAction(act_edit)
 
-        act_del = QAction("Удалить", self)
+        act_del = QAction("Видалити", self)
         act_del.triggered.connect(self._delete_device)
         menu.addAction(act_del)
 
@@ -2046,26 +2047,26 @@ class MainWindow(QMainWindow):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             name, ip, port, dtype, icon = dlg.get_values()
             if any(d.ip == ip for d in self.devices):
-                QMessageBox.warning(self, "Дубликат", f"Устройство с IP {ip} уже существует.")
+                QMessageBox.warning(self, "Дублікат", f"Пристрій з IP {ip} вже існує.")
                 return
             device = Device(name, ip, port, dtype, icon)
             self.devices.append(device)
             self._save_config()
             self._populate_table()
-            self._log(f"Добавлено устройство: {name} ({ip}:{port}) [{dtype}]")
+            self._log(f"Додано пристрій: {name} ({ip}:{port}) [{dtype}]")
             self._check_device(device)
 
     def _edit_device(self):
         device = self._get_selected_device()
         if not device:
-            QMessageBox.information(self, "Нет выбора", "Выберите устройство в таблице.")
+            QMessageBox.information(self, "Нічого не обрано", "Оберіть пристрій у таблиці.")
             return
         dlg = DeviceDialog(self, device)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             old_ip = device.ip
             new_name, new_ip, new_port, new_type, new_icon = dlg.get_values()
             if new_ip != old_ip and any(d.ip == new_ip for d in self.devices):
-                QMessageBox.warning(self, "Дубликат", f"Устройство с IP {new_ip} уже существует.")
+                QMessageBox.warning(self, "Дублікат", f"Пристрій з IP {new_ip} вже існує.")
                 return
             device.name = new_name
             device.ip = new_ip
@@ -2076,24 +2077,24 @@ class MainWindow(QMainWindow):
             device.ping_ms = None
             self._save_config()
             self._populate_table()
-            self._log(f"Изменено: {new_name} ({old_ip} → {new_ip}:{new_port}) [{new_type}]")
+            self._log(f"Змінено: {new_name} ({old_ip} → {new_ip}:{new_port}) [{new_type}]")
             self._check_device(device)
 
     def _delete_device(self):
         device = self._get_selected_device()
         if not device:
-            QMessageBox.information(self, "Нет выбора", "Выберите устройство в таблице.")
+            QMessageBox.information(self, "Нічого не обрано", "Оберіть пристрій у таблиці.")
             return
         reply = QMessageBox.question(
-            self, "Подтверждение",
-            f"Удалить устройство {device.name} ({device.ip})?",
+            self, "Підтвердження",
+            f"Видалити пристрій {device.name} ({device.ip})?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.devices.remove(device)
             self._save_config()
             self._populate_table()
-            self._log(f"Удалено устройство: {device.name} ({device.ip})")
+            self._log(f"Видалено пристрій: {device.name} ({device.ip})")
 
     # ── Журнал событий ────────────────────────────────────────────────────────
 
