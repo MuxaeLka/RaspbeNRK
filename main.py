@@ -43,7 +43,7 @@ GITHUB_REPO   = "MuxaeLka/RaspbeNRK"
 GITHUB_API    = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 VIEW_GRID     = "grid"   # режим карточек
 VIEW_TABLE    = "table"  # режим таблицы
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 
 DEFAULT_DEVICES = [
     {"name": "NRK-1", "ip": "10.60.93.50", "port": 8080, "device_type": "raspberry"},
@@ -396,22 +396,33 @@ def make_app_icon() -> QIcon:
 
 # ─── Модель устройства ─────────────────────────────────────────────────────────
 
-# Типы устройств
-DEVICE_TYPES = {
-    "raspberry": {"label": "Raspberry Pi", "color": "#e67e22", "default_port": 8080},
-    "mikrotik":  {"label": "MikroTik",     "color": "#388bfd", "default_port": 80},
+# Реестр типов устройств — расширяемый пользователем
+# Ключ = внутренний ID типа, значение = параметры
+DEVICE_TYPES: dict = {
+    "raspberry": {"label": "Raspberry Pi", "color": "#e67e22", "default_port": 8080, "icon": "🍓"},
+    "mikrotik":  {"label": "MikroTik",     "color": "#388bfd", "default_port": 80,   "icon": "🔷"},
 }
+
+# Встроенные типы нельзя удалить
+BUILTIN_TYPES = {"raspberry", "mikrotik"}
+
+# Доступные иконки для выбора в диалоге
+ICON_OPTIONS = [
+    "🍓", "🔷", "📡", "🖥️", "💻", "🖨️", "📷", "🔌",
+    "⚙️", "🔧", "🌐", "📶", "🛰️", "🤖", "🔒", "💾",
+]
 
 
 class Device:
     """Одно устройство с состоянием мониторинга. Поддерживает Raspberry Pi и MikroTik."""
 
     def __init__(self, name: str, ip: str, port: int = WEB_PORT,
-                 device_type: str = "raspberry"):
+                 device_type: str = "raspberry", icon: str = ""):
         self.name = name
         self.ip = ip
         self.port = port
-        self.device_type = device_type  # "raspberry" | "mikrotik"
+        self.device_type = device_type  # "raspberry" | "mikrotik" | custom
+        self.icon = icon  # индивидуальная иконка (emoji); если пусто — берём из типа
         self.online: bool | None = None   # None = ещё не проверяли
         self.ping_ms: float | None = None
         self.last_seen: datetime | None = None
@@ -426,12 +437,16 @@ class Device:
     def type_color(self) -> str:
         return DEVICE_TYPES.get(self.device_type, {}).get("color", PALETTE["text_dim"])
 
+    def type_icon(self) -> str:
+        return DEVICE_TYPES.get(self.device_type, {}).get("icon", "📡")
+
     def to_dict(self) -> dict:
         return {
             "name": self.name,
             "ip": self.ip,
             "port": self.port,
             "device_type": self.device_type,
+            "icon": self.icon,
         }
 
     @staticmethod
@@ -441,7 +456,12 @@ class Device:
             ip=d["ip"],
             port=d.get("port", WEB_PORT),
             device_type=d.get("device_type", "raspberry"),
+            icon=d.get("icon", ""),
         )
+
+    def effective_icon(self) -> str:
+        """Иконка устройства: индивидуальная если задана, иначе из типа."""
+        return self.icon if self.icon else self.type_icon()
 
 # ─── Поток проверки одного устройства ─────────────────────────────────────────
 
@@ -509,18 +529,27 @@ class DeviceDialog(QDialog):
 
         # Выбор типа устройства — два радио-подобных кнопки
         from PyQt6.QtWidgets import QComboBox
-        self.type_combo = QComboBox()
-        self.type_combo.setStyleSheet(
+        combo_style = (
             f"QComboBox {{ background:{PALETTE['bg_panel']}; color:{PALETTE['text_main']};"
             f"border:1px solid {PALETTE['border']}; border-radius:6px; padding:6px 10px;}}"
             f"QComboBox::drop-down {{ border:none; }}"
             f"QComboBox QAbstractItemView {{ background:{PALETTE['bg_panel']};"
             f"color:{PALETTE['text_main']}; selection-background-color:{PALETTE['bg_selected']};}}"
         )
-        self.type_combo.addItem("Raspberry Pi", "raspberry")
-        self.type_combo.addItem("MikroTik",     "mikrotik")
-        # При смене типа — подставляем дефолтный порт
+
+        # Тип устройства — заполняется из актуального реестра
+        self.type_combo = QComboBox()
+        self.type_combo.setStyleSheet(combo_style)
+        for key, val in DEVICE_TYPES.items():
+            self.type_combo.addItem(f"{val['icon']}  {val['label']}", key)
         self.type_combo.currentIndexChanged.connect(self._on_type_changed)
+
+        # Индивидуальная иконка устройства
+        self.icon_combo = QComboBox()
+        self.icon_combo.setStyleSheet(combo_style)
+        self.icon_combo.setFixedWidth(90)
+        for ico in ICON_OPTIONS:
+            self.icon_combo.addItem(ico, ico)
 
         if device:
             self.name_edit.setText(device.name)
@@ -529,18 +558,30 @@ class DeviceDialog(QDialog):
             idx = self.type_combo.findData(device.device_type)
             if idx >= 0:
                 self.type_combo.setCurrentIndex(idx)
+            # Иконка устройства
+            ico_idx = self.icon_combo.findData(getattr(device, "icon", device.type_icon()))
+            if ico_idx >= 0:
+                self.icon_combo.setCurrentIndex(ico_idx)
         else:
             self.port_edit.setText("8080")
+            # Дефолтная иконка по типу
+            self._sync_icon_from_type()
 
         def lbl(text):
             l = QLabel(text)
             l.setStyleSheet(f"color:{PALETTE['text_dim']};")
             return l
 
+        # Иконка + тип в одну строку
+        type_row = QHBoxLayout()
+        type_row.setSpacing(8)
+        type_row.addWidget(self.icon_combo)
+        type_row.addWidget(self.type_combo)
+
         form.addRow(lbl("Название:"),  self.name_edit)
         form.addRow(lbl("IP-адрес:"),  self.ip_edit)
         form.addRow(lbl("Порт:"),      self.port_edit)
-        form.addRow(lbl("Тип:"),       self.type_combo)
+        form.addRow(lbl("Тип / иконка:"), type_row)
         layout.addLayout(form)
 
         # Подсказка под формой
@@ -560,15 +601,23 @@ class DeviceDialog(QDialog):
         layout.addWidget(buttons)
 
     def _on_type_changed(self, _idx: int):
-        """При смене типа подставляем дефолтный порт если поле не редактировалось."""
+        """При смене типа подставляем дефолтный порт и синхронизируем иконку."""
         dtype = self.type_combo.currentData()
         default_port = DEVICE_TYPES.get(dtype, {}).get("default_port", 80)
-        # Подставляем дефолт только если порт стандартный для другого типа
         current = self.port_edit.text().strip()
         known_defaults = {str(v["default_port"]) for v in DEVICE_TYPES.values()}
         if not current or current in known_defaults:
             self.port_edit.setText(str(default_port))
+        self._sync_icon_from_type()
         self._update_hint()
+
+    def _sync_icon_from_type(self):
+        """Подставить иконку по умолчанию для текущего типа."""
+        dtype = self.type_combo.currentData()
+        default_icon = DEVICE_TYPES.get(dtype, {}).get("icon", "📡")
+        idx = self.icon_combo.findData(default_icon)
+        if idx >= 0:
+            self.icon_combo.setCurrentIndex(idx)
 
     def _update_hint(self):
         dtype = self.type_combo.currentData()
@@ -599,12 +648,13 @@ class DeviceDialog(QDialog):
             return
         self.accept()
 
-    def get_values(self) -> tuple[str, str, int, str]:
+    def get_values(self) -> tuple[str, str, int, str, str]:
         return (
             self.name_edit.text().strip(),
             self.ip_edit.text().strip(),
             int(self.port_edit.text().strip()),
             self.type_combo.currentData(),
+            self.icon_combo.currentData(),
         )
 
 
@@ -676,9 +726,8 @@ class DeviceCard(QFrame):
     def refresh(self):
         """Обновить отображение из device.online / device.ping_ms."""
         d = self.device
-        # Иконка по типу
-        icons = {"raspberry": "🍓", "mikrotik": "🔷"}
-        self._icon_lbl.setText(icons.get(d.device_type, "📡"))
+        # Индивидуальная иконка или из реестра типов
+        self._icon_lbl.setText(d.effective_icon())
 
         self._name_lbl.setText(d.name)
         self._ip_lbl.setText(d.ip)
@@ -756,6 +805,255 @@ class UpdateChecker(QThread):
         except Exception:
             self.no_update.emit()
 
+
+
+# ─── Диалог реестра типов устройств ───────────────────────────────────────────
+
+class TypeRegistryDialog(QDialog):
+    """
+    Управление реестром типов устройств.
+    Позволяет добавлять и удалять пользовательские типы.
+    Встроенные типы (raspberry, mikrotik) защищены от удаления.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Реестр типов устройств")
+        self.setModal(True)
+        self.setMinimumSize(500, 380)
+        self.setStyleSheet(QSS)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        # Заголовок
+        title = QLabel("Типы устройств")
+        title.setStyleSheet(f"font-size:15px; font-weight:700; color:{PALETTE['text_main']};")
+        layout.addWidget(title)
+
+        sub = QLabel("Встроенные типы защищены от удаления. "
+                     "Добавленные типы сохраняются в config.json.")
+        sub.setStyleSheet(f"font-size:11px; color:{PALETTE['text_dim']};")
+        sub.setWordWrap(True)
+        layout.addWidget(sub)
+
+        # Таблица типов
+        self.table = QTableWidget()
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["ID", "Название", "Иконка", "Порт", "Цвет"])
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
+        self.table.setStyleSheet(
+            f"QTableWidget {{alternate-background-color: {PALETTE['bg_row_alt']};}}"
+        )
+        layout.addWidget(self.table)
+
+        # Кнопки
+        btn_row = QHBoxLayout()
+        self.btn_add = QPushButton("+ Добавить тип")
+        self.btn_add.clicked.connect(self._add_type)
+        self.btn_del = QPushButton("Удалить")
+        self.btn_del.setObjectName("danger")
+        self.btn_del.clicked.connect(self._delete_type)
+        btn_row.addWidget(self.btn_add)
+        btn_row.addWidget(self.btn_del)
+        btn_row.addStretch()
+        close_btn = QPushButton("Закрыть")
+        close_btn.setObjectName("primary")
+        close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+
+        self._refresh_table()
+
+    def _refresh_table(self):
+        self.table.setRowCount(0)
+        self.table.setRowCount(len(DEVICE_TYPES))
+        for row, (key, val) in enumerate(DEVICE_TYPES.items()):
+            builtin = key in BUILTIN_TYPES
+
+            id_item = QTableWidgetItem(key)
+            id_item.setForeground(QBrush(QColor(
+                PALETTE["text_dim"] if builtin else PALETTE["text_main"]
+            )))
+            self.table.setItem(row, 0, id_item)
+
+            name_item = QTableWidgetItem(val["label"])
+            if builtin:
+                name_item.setForeground(QBrush(QColor(PALETTE["text_dim"])))
+            self.table.setItem(row, 1, name_item)
+
+            icon_item = QTableWidgetItem(val.get("icon", "📡"))
+            icon_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(row, 2, icon_item)
+
+            port_item = QTableWidgetItem(str(val["default_port"]))
+            port_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(row, 3, port_item)
+
+            color_item = QTableWidgetItem(val["color"])
+            color_item.setForeground(QBrush(QColor(val["color"])))
+            color_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(row, 4, color_item)
+
+            # Встроенные — серый фон
+            if builtin:
+                for col in range(5):
+                    item = self.table.item(row, col)
+                    if item:
+                        item.setBackground(QBrush(QColor(PALETTE["bg_row_alt"])))
+
+            self.table.setRowHeight(row, 36)
+
+    def _add_type(self):
+        dlg = AddTypeDialog(self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            key, label, icon, port, color = dlg.get_values()
+            if key in DEVICE_TYPES:
+                QMessageBox.warning(self, "Ошибка", f"Тип с ID '{key}' уже существует.")
+                return
+            DEVICE_TYPES[key] = {
+                "label": label,
+                "icon": icon,
+                "default_port": port,
+                "color": color,
+            }
+            self._refresh_table()
+
+    def _delete_type(self):
+        row = self.table.currentRow()
+        if row < 0:
+            return
+        key = self.table.item(row, 0).text()
+        if key in BUILTIN_TYPES:
+            QMessageBox.warning(self, "Защищено",
+                                f"Тип '{key}' встроенный и не может быть удалён.")
+            return
+        reply = QMessageBox.question(
+            self, "Удалить тип",
+            f"Удалить тип '{key}'?\n\n"
+            f"Устройства с этим типом сохранят тип как ID.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            DEVICE_TYPES.pop(key, None)
+            self._refresh_table()
+
+
+# ─── Диалог добавления нового типа ────────────────────────────────────────────
+
+class AddTypeDialog(QDialog):
+    """Форма для добавления нового пользовательского типа устройства."""
+
+    # Палитра цветов для выбора
+    COLOR_OPTIONS = [
+        "#e67e22", "#388bfd", "#3fb950", "#f85149", "#d29922",
+        "#a371f7", "#39d353", "#58a6ff", "#ff7b72", "#ffa657",
+    ]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Добавить тип устройства")
+        self.setModal(True)
+        self.setMinimumWidth(360)
+        self.setStyleSheet(QSS)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        title = QLabel("Новый тип устройства")
+        title.setStyleSheet(f"font-size:14px; font-weight:700; color:{PALETTE['text_main']};")
+        layout.addWidget(title)
+
+        form = QFormLayout()
+        form.setSpacing(10)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
+        def lbl(text):
+            l = QLabel(text)
+            l.setStyleSheet(f"color:{PALETTE['text_dim']};")
+            return l
+
+        self.id_edit = QLineEdit()
+        self.id_edit.setPlaceholderText("camera, switch, sensor ...")
+        form.addRow(lbl("ID (латиница):"), self.id_edit)
+
+        self.label_edit = QLineEdit()
+        self.label_edit.setPlaceholderText("IP Camera")
+        form.addRow(lbl("Название:"), self.label_edit)
+
+        self.port_edit = QLineEdit()
+        self.port_edit.setPlaceholderText("80")
+        self.port_edit.setText("80")
+        form.addRow(lbl("Порт:"), self.port_edit)
+
+        # Иконка
+        combo_style = (
+            f"QComboBox {{ background:{PALETTE['bg_panel']}; color:{PALETTE['text_main']};"
+            f"border:1px solid {PALETTE['border']}; border-radius:6px; padding:6px 10px;}}"
+            f"QComboBox::drop-down {{ border:none; }}"
+            f"QComboBox QAbstractItemView {{ background:{PALETTE['bg_panel']};"
+            f"color:{PALETTE['text_main']}; selection-background-color:{PALETTE['bg_selected']};}}"
+        )
+        self.icon_combo = QComboBox()
+        self.icon_combo.setStyleSheet(combo_style)
+        for ico in ICON_OPTIONS:
+            self.icon_combo.addItem(ico, ico)
+        form.addRow(lbl("Иконка:"), self.icon_combo)
+
+        # Цвет
+        self.color_combo = QComboBox()
+        self.color_combo.setStyleSheet(combo_style)
+        for color in self.COLOR_OPTIONS:
+            self.color_combo.addItem(color, color)
+            idx = self.color_combo.count() - 1
+            self.color_combo.setItemData(
+                idx, QBrush(QColor(color)), Qt.ItemDataRole.ForegroundRole
+            )
+        form.addRow(lbl("Цвет:"), self.color_combo)
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self._on_accept)
+        buttons.rejected.connect(self.reject)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setObjectName("primary")
+        layout.addWidget(buttons)
+
+    def _on_accept(self):
+        key = self.id_edit.text().strip().lower().replace(" ", "_")
+        label = self.label_edit.text().strip()
+        port = self.port_edit.text().strip()
+        if not key or not label:
+            QMessageBox.warning(self, "Ошибка", "Заполните ID и название.")
+            return
+        if not key.isidentifier():
+            QMessageBox.warning(self, "Ошибка",
+                                "ID должен содержать только латинские буквы, цифры и _")
+            return
+        if not port.isdigit() or not (1 <= int(port) <= 65535):
+            QMessageBox.warning(self, "Ошибка", "Порт: число от 1 до 65535.")
+            return
+        self.accept()
+
+    def get_values(self) -> tuple[str, str, str, int, str]:
+        return (
+            self.id_edit.text().strip().lower().replace(" ", "_"),
+            self.label_edit.text().strip(),
+            self.icon_combo.currentData(),
+            int(self.port_edit.text().strip()),
+            self.color_combo.currentData(),
+        )
 
 # ─── Виджет заголовка ─────────────────────────────────────────────────────────
 
@@ -851,6 +1149,10 @@ class MainWindow(QMainWindow):
             try:
                 with open(CONFIG_FILE, encoding="utf-8") as f:
                     data = json.load(f)
+                # Загружаем пользовательские типы устройств
+                for key, val in data.get("device_types", {}).items():
+                    if key not in DEVICE_TYPES:
+                        DEVICE_TYPES[key] = val
                 self.devices = [Device.from_dict(d) for d in data.get("devices", [])]
                 return
             except Exception as e:
@@ -861,7 +1163,13 @@ class MainWindow(QMainWindow):
 
     def _save_config(self):
         try:
-            data = {"devices": [d.to_dict() for d in self.devices]}
+            # Сохраняем только пользовательские типы (не встроенные)
+            custom_types = {k: v for k, v in DEVICE_TYPES.items()
+                            if k not in BUILTIN_TYPES}
+            data = {
+                "devices": [d.to_dict() for d in self.devices],
+                "device_types": custom_types,
+            }
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
@@ -1028,6 +1336,10 @@ class MainWindow(QMainWindow):
         self.btn_del.clicked.connect(self._delete_device)
         tb.addWidget(self.btn_del)
 
+        self.btn_types = btn("⚙ Типы", tooltip="Управление реестром типов устройств")
+        self.btn_types.clicked.connect(self._open_type_registry)
+        tb.addWidget(self.btn_types)
+
         # Разделитель
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.VLine)
@@ -1155,6 +1467,14 @@ class MainWindow(QMainWindow):
 
     # ── Поиск ────────────────────────────────────────────────────────────────
 
+
+    def _open_type_registry(self):
+        """Открыть диалог реестра типов. После закрытия — обновить комбо в диалогах."""
+        dlg = TypeRegistryDialog(self)
+        dlg.exec()
+        # Сохраняем новые типы в конфиг
+        self._save_config()
+        self._log(f"Реестр типов обновлён. Типов: {len(DEVICE_TYPES)}")
 
     # ── Переключение вида ─────────────────────────────────────────────────────
 
@@ -1335,11 +1655,11 @@ class MainWindow(QMainWindow):
     def _add_device(self):
         dlg = DeviceDialog(self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
-            name, ip, port, dtype = dlg.get_values()
+            name, ip, port, dtype, icon = dlg.get_values()
             if any(d.ip == ip for d in self.devices):
                 QMessageBox.warning(self, "Дубликат", f"Устройство с IP {ip} уже существует.")
                 return
-            device = Device(name, ip, port, dtype)
+            device = Device(name, ip, port, dtype, icon)
             self.devices.append(device)
             self._save_config()
             self._populate_table()
@@ -1354,7 +1674,7 @@ class MainWindow(QMainWindow):
         dlg = DeviceDialog(self, device)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             old_ip = device.ip
-            new_name, new_ip, new_port, new_type = dlg.get_values()
+            new_name, new_ip, new_port, new_type, new_icon = dlg.get_values()
             if new_ip != old_ip and any(d.ip == new_ip for d in self.devices):
                 QMessageBox.warning(self, "Дубликат", f"Устройство с IP {new_ip} уже существует.")
                 return
@@ -1362,6 +1682,7 @@ class MainWindow(QMainWindow):
             device.ip = new_ip
             device.port = new_port
             device.device_type = new_type
+            device.icon = new_icon
             device.online = None
             device.ping_ms = None
             self._save_config()

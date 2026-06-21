@@ -1,0 +1,54 @@
+name: Build & Release RaspbeNRK
+
+on:
+  push:
+    tags:
+      - 'v*'   # Запускается только когда пушишь тег вида v1.0.2
+
+jobs:
+  build:
+    runs-on: windows-latest   # Сборка на Windows (важно для PyQt6)
+
+    steps:
+      # 1. Получаем код
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Устанавливаем Python 3.12
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # 3. Устанавливаем зависимости
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      # 4. Собираем EXE через PyInstaller
+      - name: Build EXE
+        run: |
+          pyinstaller --onefile --windowed `
+            --icon=resources/icon.ico `
+            --add-data "resources/icon.ico;." `
+            --name "RaspbeNRK" `
+            main.py
+
+      # 5. Создаём GitHub Release и прикрепляем EXE
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "RaspbeNRK ${{ github.ref_name }}"
+          body: |
+            ## ${{ github.ref_name }}
+
+            ### Установка
+            1. Скачай `RaspbeNRK.exe`
+            2. Положи рядом `config.json` (или создастся автоматически)
+            3. Запускай
+
+          files: dist/RaspbeNRK.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
