@@ -2,31 +2,60 @@
   "devices": [
     {
       "name": "NRK-1",
-      "ip": "10.60.93.50"
+      "ip": "10.60.93.50",
+      "port": 8080,
+      "device_type": "raspberry",
+      "icon": "",
+      "ping_mode": "tcp"
     },
     {
       "name": "NRK-2",
-      "ip": "10.60.93.51"
+      "ip": "10.60.93.51",
+      "port": 8080,
+      "device_type": "raspberry",
+      "icon": "",
+      "ping_mode": "tcp"
     },
     {
       "name": "NRK-3",
-      "ip": "10.60.93.52"
+      "ip": "10.60.93.52",
+      "port": 8080,
+      "device_type": "raspberry",
+      "icon": "",
+      "ping_mode": "tcp"
     },
     {
       "name": "NRK-4",
-      "ip": "10.60.93.53"
+      "ip": "10.60.93.53",
+      "port": 8080,
+      "device_type": "raspberry",
+      "icon": "",
+      "ping_mode": "tcp"
     },
     {
       "name": "NRK-5",
-      "ip": "10.60.93.54"
+      "ip": "10.60.93.54",
+      "port": 8080,
+      "device_type": "raspberry",
+      "icon": "",
+      "ping_mode": "tcp"
     },
     {
       "name": "NRK-6",
-      "ip": "10.60.93.55"
+      "ip": "10.60.93.55",
+      "port": 8080,
+      "device_type": "raspberry",
+      "icon": "",
+      "ping_mode": "tcp"
     },
     {
       "name": "NRK-7",
-      "ip": "10.60.93.56"
+      "ip": "10.60.93.56",
+      "port": 8080,
+      "device_type": "raspberry",
+      "icon": "",
+      "ping_mode": "tcp"
     }
-  ]
+  ],
+  "device_types": {}
 }
