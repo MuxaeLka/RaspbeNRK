@@ -10,6 +10,8 @@ import time
 import socket
 import webbrowser
 import threading
+import urllib.request
+import urllib.error
 from pathlib import Path
 from datetime import datetime
 
@@ -18,11 +20,11 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QPushButton, QLineEdit, QLabel,
     QHeaderView, QDialog, QFormLayout, QDialogButtonBox, QTextEdit,
     QSplitter, QMessageBox, QMenu, QAbstractItemView, QStatusBar,
-    QFrame, QSizePolicy
+    QFrame, QSizePolicy, QScrollArea, QGridLayout
 )
 from PyQt6.QtCore import (
     Qt, QThread, pyqtSignal, QTimer, QSortFilterProxyModel,
-    QItemSelectionModel, QSize
+    QItemSelectionModel, QSize, QPropertyAnimation, QEasingCurve
 )
 from PyQt6.QtGui import (
     QColor, QFont, QIcon, QPalette, QBrush, QAction,
@@ -36,7 +38,12 @@ WEB_PORT = 8080       # порт по умолчанию для Raspberry Pi
 MIKROTIK_PORT = 80    # порт по умолчанию для MikroTik
 PING_TIMEOUT = 2          # секунд на попытку TCP-connect
 CHECK_INTERVAL_MS = 5000  # интервал автопроверки, мс
-APP_VERSION = "1.0.0"
+
+GITHUB_REPO   = "MuxaeLka/RaspbeNRK"
+GITHUB_API    = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+VIEW_GRID     = "grid"   # режим карточек
+VIEW_TABLE    = "table"  # режим таблицы
+APP_VERSION = "1.0.1"
 
 DEFAULT_DEVICES = [
     {"name": "NRK-1", "ip": "10.60.93.50", "port": 8080, "device_type": "raspberry"},
@@ -79,8 +86,43 @@ QSS = f"""
 QMainWindow, QWidget {{
     background-color: {PALETTE['bg_deep']};
     color: {PALETTE['text_main']};
-    font-family: 'Segoe UI', 'Inter', sans-serif;
-    font-size: 13px;
+    font-family: 'Segoe UI Variable', 'Segoe UI', 'Inter', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.1px;
+}}
+
+/* ── Карточки устройств ────────────────────────────────── */
+QFrame#device_card {{
+    background-color: {PALETTE['bg_panel']};
+    border: 1px solid {PALETTE['border']};
+    border-radius: 10px;
+}}
+
+QFrame#device_card:hover {{
+    border-color: {PALETTE['text_dim']};
+}}
+
+QLabel#card_name {{
+    font-size: 12px;
+    font-weight: 600;
+    color: {PALETTE['text_main']};
+}}
+
+QLabel#card_ip {{
+    font-size: 10px;
+    color: {PALETTE['text_dim']};
+    font-family: 'Consolas', monospace;
+}}
+
+QLabel#card_ping {{
+    font-size: 10px;
+    color: {PALETTE['text_dim']};
+}}
+
+QLabel#card_type {{
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
 }}
 
 QTableWidget {{
@@ -375,9 +417,7 @@ class Device:
         self.last_seen: datetime | None = None
 
     def web_url(self) -> str:
-        """URL для открытия в браузере / Winbox."""
-        if self.device_type == "mikrotik":
-            return f"winbox://{self.ip}"
+        """URL для открытия в браузере."""
         return f"http://{self.ip}:{self.port}"
 
     def type_label(self) -> str:
@@ -567,6 +607,156 @@ class DeviceDialog(QDialog):
             self.type_combo.currentData(),
         )
 
+
+# ─── Карточка устройства (Grid-вид) ───────────────────────────────────────────
+
+class DeviceCard(QFrame):
+    """
+    Карточка одного устройства для Grid-вида.
+    Красное свечение = офлайн, мигающее зелёное = онлайн.
+    Двойной клик = открыть устройство.
+    """
+    double_clicked = pyqtSignal(object)  # передаёт Device
+
+    # Цвета свечения
+    GLOW_ONLINE  = "0 0 12px 3px rgba(63, 185, 80, 0.75)"
+    GLOW_OFFLINE = "0 0 12px 3px rgba(248, 81, 73, 0.65)"
+    GLOW_NONE    = "none"
+
+    def __init__(self, device, parent=None):
+        super().__init__(parent)
+        self.device = device
+        self.setObjectName("device_card")
+        self.setFixedSize(170, 140)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        # Таймер мигания (онлайн)
+        self._blink_state = True
+        self._blink_timer = QTimer(self)
+        self._blink_timer.timeout.connect(self._blink_tick)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 14, 12, 10)
+        layout.setSpacing(4)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # Иконка (emoji как текст — без доп. зависимостей)
+        self._icon_lbl = QLabel()
+        self._icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._icon_lbl.setStyleSheet("font-size: 28px; background: transparent;")
+        layout.addWidget(self._icon_lbl)
+
+        # Название
+        self._name_lbl = QLabel()
+        self._name_lbl.setObjectName("card_name")
+        self._name_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._name_lbl.setWordWrap(True)
+        layout.addWidget(self._name_lbl)
+
+        # IP
+        self._ip_lbl = QLabel()
+        self._ip_lbl.setObjectName("card_ip")
+        self._ip_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self._ip_lbl)
+
+        # Тип
+        self._type_lbl = QLabel()
+        self._type_lbl.setObjectName("card_type")
+        self._type_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self._type_lbl)
+
+        # Отклик / статус
+        self._ping_lbl = QLabel()
+        self._ping_lbl.setObjectName("card_ping")
+        self._ping_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self._ping_lbl)
+
+        self.refresh()
+
+    def refresh(self):
+        """Обновить отображение из device.online / device.ping_ms."""
+        d = self.device
+        # Иконка по типу
+        icons = {"raspberry": "🍓", "mikrotik": "🔷"}
+        self._icon_lbl.setText(icons.get(d.device_type, "📡"))
+
+        self._name_lbl.setText(d.name)
+        self._ip_lbl.setText(d.ip)
+        self._type_lbl.setText(d.type_label().upper())
+        self._type_lbl.setStyleSheet(
+            f"font-size:9px; font-weight:600; letter-spacing:0.6px;"
+            f"color:{d.type_color()}; background:transparent;"
+        )
+
+        # Статус и свечение
+        if d.online is None:
+            self._ping_lbl.setText("⏳ проверка...")
+            self._ping_lbl.setStyleSheet(f"color:{PALETTE['text_dim']}; background:transparent;")
+            self._set_glow("none")
+            self._blink_timer.stop()
+        elif d.online:
+            ping = f"{d.ping_ms} мс" if d.ping_ms is not None else ""
+            self._ping_lbl.setText(f"● {ping}")
+            self._ping_lbl.setStyleSheet(f"color:{PALETTE['online']}; font-size:10px; background:transparent;")
+            self._blink_timer.start(800)  # мигаем каждые 800 мс
+        else:
+            self._ping_lbl.setText("● офлайн")
+            self._ping_lbl.setStyleSheet(f"color:{PALETTE['offline']}; font-size:10px; background:transparent;")
+            self._set_glow("offline")
+            self._blink_timer.stop()
+
+    def _blink_tick(self):
+        """Чередуем свечение вкл/выкл для онлайн-эффекта."""
+        self._blink_state = not self._blink_state
+        self._set_glow("online" if self._blink_state else "none")
+
+    def _set_glow(self, state: str):
+        """Применяем box-shadow через stylesheet."""
+        if state == "online":
+            shadow = f"border: 1px solid {PALETTE['online']}; border-radius: 10px; background-color: {PALETTE['bg_panel']};"
+        elif state == "offline":
+            shadow = f"border: 1px solid {PALETTE['offline']}; border-radius: 10px; background-color: {PALETTE['bg_panel']};"
+        else:
+            shadow = f"border: 1px solid {PALETTE['border']}; border-radius: 10px; background-color: {PALETTE['bg_panel']};"
+        self.setStyleSheet(f"QFrame#device_card {{ {shadow} }}")
+
+    def mouseDoubleClickEvent(self, event):
+        self.double_clicked.emit(self.device)
+        super().mouseDoubleClickEvent(event)
+
+    def contextMenuEvent(self, event):
+        # Пробрасываем в MainWindow через сигнал
+        self.double_clicked.emit(self.device)  # просто открываем
+
+
+# ─── Поток проверки обновлений ─────────────────────────────────────────────────
+
+class UpdateChecker(QThread):
+    """Проверяет последний релиз на GitHub и сигнализирует если есть новая версия."""
+    update_available = pyqtSignal(str, str)  # (latest_version, download_url)
+    no_update = pyqtSignal()
+
+    def run(self):
+        try:
+            req = urllib.request.Request(
+                GITHUB_API,
+                headers={"User-Agent": f"NRK-Manager/{APP_VERSION}"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                import json as _json
+                data = _json.loads(resp.read().decode())
+            tag = data.get("tag_name", "").lstrip("v")
+            assets = data.get("assets", [])
+            url = next((a["browser_download_url"] for a in assets
+                        if a["name"].endswith(".exe")), "")
+            if tag and tag != APP_VERSION and url:
+                self.update_available.emit(tag, url)
+            else:
+                self.no_update.emit()
+        except Exception:
+            self.no_update.emit()
+
+
 # ─── Виджет заголовка ─────────────────────────────────────────────────────────
 
 class HeaderWidget(QWidget):
@@ -619,10 +809,14 @@ class MainWindow(QMainWindow):
         self.resize(1100, 700)
         self.setWindowIcon(make_app_icon())
 
+        # Режим отображения
+        self._view_mode = VIEW_GRID  # grid | table
+
         # Устройства и воркеры
         self.devices: list[Device] = []
         self._workers: dict[str, PingWorker] = {}   # ip -> worker
         self._lock = threading.Lock()               # для безопасного доступа к workers
+        self._cards: dict[str, DeviceCard] = {}     # ip -> DeviceCard
 
         # Загрузка конфига
         self._load_config()
@@ -644,6 +838,11 @@ class MainWindow(QMainWindow):
 
         self._log("Приложение запущено.")
         self._log(f"Загружено устройств: {len(self.devices)}")
+
+        # Проверка обновлений
+        self._update_checker = UpdateChecker()
+        self._update_checker.update_available.connect(self._on_update_available)
+        self._update_checker.start()
 
     # ── Загрузка/сохранение конфига ───────────────────────────────────────────
 
@@ -696,7 +895,21 @@ class MainWindow(QMainWindow):
         toolbar = self._build_toolbar()
         top_layout.addLayout(toolbar)
 
-        # Таблица
+        # ── Grid-вид (карточки) ──────────────────────────────────────────
+        self.grid_scroll = QScrollArea()
+        self.grid_scroll.setWidgetResizable(True)
+        self.grid_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.grid_scroll.setStyleSheet(f"background:{PALETTE['bg_deep']}; border:none;")
+
+        self.grid_container = QWidget()
+        self.grid_container.setStyleSheet(f"background:{PALETTE['bg_deep']};")
+        self.grid_layout = QGridLayout(self.grid_container)
+        self.grid_layout.setContentsMargins(8, 8, 8, 8)
+        self.grid_layout.setSpacing(12)
+        self.grid_scroll.setWidget(self.grid_container)
+        top_layout.addWidget(self.grid_scroll)
+
+        # ── Таблица
         self.table = QTableWidget()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels(["Название", "IP-адрес", "Тип", "Статус", "Отклик (мс)", "Последняя проверка"])
@@ -719,6 +932,9 @@ class MainWindow(QMainWindow):
             f"QTableWidget {{alternate-background-color: {PALETTE['bg_row_alt']};}}"
         )
         top_layout.addWidget(self.table)
+
+        # Показываем нужный вид
+        self._apply_view_mode()
         splitter.addWidget(top_widget)
 
         # Нижняя часть: лог
@@ -812,25 +1028,60 @@ class MainWindow(QMainWindow):
         self.btn_del.clicked.connect(self._delete_device)
         tb.addWidget(self.btn_del)
 
+        # Разделитель
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.Shape.VLine)
+        sep2.setStyleSheet(f"color:{PALETTE['border']};")
+        tb.addWidget(sep2)
+
+        # Переключатель вида
+        self.btn_view = btn("⊞  Grid", tooltip="Переключить вид: карточки / таблица")
+        self.btn_view.setFixedWidth(80)
+        self.btn_view.clicked.connect(self._toggle_view)
+        tb.addWidget(self.btn_view)
+
         return tb
 
     # ── Заполнение таблицы ────────────────────────────────────────────────────
 
     def _populate_table(self):
-        """Перестроить таблицу из списка self.devices с учётом фильтра."""
+        """Перестроить таблицу и grid из списка self.devices с учётом фильтра."""
         query = self.search_edit.text().strip().lower() if hasattr(self, "search_edit") else ""
-        self.table.setSortingEnabled(False)
-        self.table.setRowCount(0)
 
         visible = [d for d in self.devices if
                    not query or query in d.name.lower() or query in d.ip.lower()]
 
+        # ── Таблица
+        self.table.setSortingEnabled(False)
+        self.table.setRowCount(0)
         self.table.setRowCount(len(visible))
         for row, device in enumerate(visible):
             self._set_row(row, device)
-
         self.table.setSortingEnabled(True)
+
+        # ── Grid
+        self._rebuild_grid(visible)
+
         self._update_header_status()
+
+    def _rebuild_grid(self, visible: list):
+        """Перестроить карточки в grid-контейнере."""
+        # Удаляем старые карточки
+        while self.grid_layout.count():
+            item = self.grid_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._cards.clear()
+
+        cols = max(1, self.grid_scroll.width() // 190) if hasattr(self, 'grid_scroll') else 5
+        for idx, device in enumerate(visible):
+            card = DeviceCard(device)
+            card.double_clicked.connect(self._open_device)
+            self._cards[device.ip] = card
+            self.grid_layout.addWidget(card, idx // cols, idx % cols)
+
+        # Распорка снизу чтобы карточки не растягивались
+        self.grid_layout.setRowStretch(len(visible) // cols + 1, 1)
 
     def _set_row(self, row: int, device: Device):
         """Заполнить одну строку таблицы данными устройства."""
@@ -904,6 +1155,42 @@ class MainWindow(QMainWindow):
 
     # ── Поиск ────────────────────────────────────────────────────────────────
 
+
+    # ── Переключение вида ─────────────────────────────────────────────────────
+
+    def _toggle_view(self):
+        self._view_mode = VIEW_TABLE if self._view_mode == VIEW_GRID else VIEW_GRID
+        self._apply_view_mode()
+        # Перестраиваем grid при переключении (чтобы правильно рассчитать cols)
+        if self._view_mode == VIEW_GRID:
+            query = self.search_edit.text().strip().lower()
+            visible = [d for d in self.devices if
+                       not query or query in d.name.lower() or query in d.ip.lower()]
+            self._rebuild_grid(visible)
+
+    def _apply_view_mode(self):
+        is_grid = self._view_mode == VIEW_GRID
+        self.grid_scroll.setVisible(is_grid)
+        self.table.setVisible(not is_grid)
+        if hasattr(self, 'btn_view'):
+            self.btn_view.setText("≡  Table" if is_grid else "⊞  Grid")
+
+    # ── Авто-апдейтер ─────────────────────────────────────────────────────────
+
+    def _on_update_available(self, version: str, url: str):
+        """Показываем уведомление о новой версии."""
+        self._log(f"Доступна новая версия v{version}!", error=False)
+        reply = QMessageBox.question(
+            self,
+            "Обновление доступно",
+            f"Доступна версия v{version}.\n\n"
+            f"Текущая версия: v{APP_VERSION}\n\n"
+            f"Открыть страницу загрузки?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            webbrowser.open(url)
+
     def _apply_filter(self, _text: str = ""):
         self._populate_table()
 
@@ -963,6 +1250,10 @@ class MainWindow(QMainWindow):
                 self._update_status_cells(row, device)
                 break
 
+        # Обновляем карточку в grid-виде
+        if hasattr(self, '_cards') and ip in self._cards:
+            self._cards[ip].refresh()
+
         self._update_header_status()
 
     def _update_header_status(self):
@@ -995,7 +1286,7 @@ class MainWindow(QMainWindow):
 
     def _open_device(self, device: Device):
         url = device.web_url()
-        self._log(f"Открываем браузер: {url}")
+        self._log(f"Открываем: {url}")
         webbrowser.open(url)
 
     def _open_all(self):
@@ -1109,9 +1400,20 @@ class MainWindow(QMainWindow):
 
     # ── Завершение работы ─────────────────────────────────────────────────────
 
+    def resizeEvent(self, event):
+        """При изменении ширины окна перестраиваем grid чтобы колонки пересчитались."""
+        super().resizeEvent(event)
+        if self._view_mode == VIEW_GRID and hasattr(self, '_cards') and self._cards:
+            query = self.search_edit.text().strip().lower() if hasattr(self, 'search_edit') else ''
+            visible = [d for d in self.devices if
+                       not query or query in d.name.lower() or query in d.ip.lower()]
+            self._rebuild_grid(visible)
+
     def closeEvent(self, event):
         """Корректно останавливаем все активные потоки перед закрытием."""
         self._timer.stop()
+        if hasattr(self, '_update_checker'):
+            self._update_checker.wait(2000)
         with self._lock:
             workers = list(self._workers.values())
 
