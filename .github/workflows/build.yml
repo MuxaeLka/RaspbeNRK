@@ -3,7 +3,8 @@ name: Build & Release RaspbeNRK
 on:
   push:
     tags:
-      - 'v*'
+      - 'desktop-v*.*.*'
+  workflow_dispatch:
 
 # Явно даємо дозвіл на запис у репозиторій
 permissions:
