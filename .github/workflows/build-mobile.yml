@@ -1,0 +1,115 @@
+name: Build & Release APK
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v1.0.1)'
+        required: true
+        default: 'v1.0.1'
+
+jobs:
+  build:
+    name: Build Flutter APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Java 17 (потрібно для Gradle) ─────────────────────────
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # ── 3. Flutter SDK ────────────────────────────────────────────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      # ── 4. Залежності ────────────────────────────────────────────
+      - name: Install Flutter dependencies
+        run: flutter pub get
+        working-directory: mobile
+
+      # ── 5. Аналіз коду (необов'язково, але добре) ────────────────
+      - name: Analyze code
+        run: flutter analyze --no-fatal-infos
+        working-directory: mobile
+        continue-on-error: true
+
+      # ── 6. Збірка APK release ────────────────────────────────────
+      - name: Build APK (release)
+        run: flutter build apk --release --split-per-abi
+        working-directory: mobile
+
+      # ── 7. Перейменування APK ────────────────────────────────────
+      - name: Rename APK files
+        run: |
+          VERSION="${{ github.ref_name || github.event.inputs.version }}"
+          cd mobile/build/flutter/outputs/flutter-apk
+          for f in *.apk; do
+            mv "$f" "NRKManager-${VERSION}-${f}"
+          done
+          ls -la
+
+      # ── 8. Universal APK (також збираємо fat APK) ────────────────
+      - name: Build universal APK
+        run: flutter build apk --release
+        working-directory: mobile
+
+      - name: Rename universal APK
+        run: |
+          VERSION="${{ github.ref_name || github.event.inputs.version }}"
+          mv mobile/build/flutter/outputs/flutter-apk/app-release.apk \
+             mobile/build/flutter/outputs/flutter-apk/NRKManager-${VERSION}-universal.apk
+
+      # ── 9. Upload artifact ────────────────────────────────────────
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nrk-manager-apk
+          path: mobile/build/flutter/outputs/flutter-apk/*.apk
+          retention-days: 30
+
+      # ── 10. Публікація GitHub Release ─────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: "NRK Manager ${{ github.ref_name }}"
+          body: |
+            ## NRK Manager ${{ github.ref_name }}
+
+            ### Встановлення
+            1. Завантажте APK для вашої архітектури:
+               - `arm64-v8a` — Samsung S24 Ultra та більшість сучасних Android (рекомендовано)
+               - `armeabi-v7a` — старі 32-bit пристрої
+               - `universal` — якщо не впевнені
+            2. На телефоні: Налаштування → Безпека → Невідомі джерела → Дозволити
+            3. Відкрийте APK через файловий менеджер або встановіть через ADB:
+               ```bash
+               adb install NRKManager-${{ github.ref_name }}-arm64-v8a.apk
+               ```
+
+            ### Вимоги
+            - Android 6.0+ (API 23)
+            - WireGuard VPN підключення до мережі 10.60.93.0/24
+
+            ### Зміни
+            - Дивіться commits між тегами
+          files: |
+            mobile/build/flutter/outputs/flutter-apk/*.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
