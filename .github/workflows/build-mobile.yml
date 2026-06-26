@@ -55,7 +55,7 @@ jobs:
       - name: Rename APK files
         run: |
           VERSION="${{ github.ref_name || github.event.inputs.version }}"
-          cd mobile/build/flutter/outputs/flutter-apk
+          cd mobile/build/app/outputs/flutter-apk
           for f in *.apk; do
             mv "$f" "NRKManager-${VERSION}-${f}"
           done
@@ -69,15 +69,15 @@ jobs:
       - name: Rename universal APK
         run: |
           VERSION="${{ github.ref_name || github.event.inputs.version }}"
-          mv mobile/build/flutter/outputs/flutter-apk/app-release.apk \
-             mobile/build/flutter/outputs/flutter-apk/NRKManager-${VERSION}-universal.apk
+          mv mobile/build/app/outputs/flutter-apk/app-release.apk \
+             mobile/build/app/outputs/flutter-apk/NRKManager-${VERSION}-universal.apk
 
       # ── 9. Upload artifact ────────────────────────────────────────
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: nrk-manager-apk
-          path: mobile/build/flutter/outputs/flutter-apk/*.apk
+          path: mobile/build/app/outputs/flutter-apk/*.apk
           retention-days: 30
 
       # ── 10. Публікація GitHub Release ─────────────────────────────
